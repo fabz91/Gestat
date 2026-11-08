@@ -1,0 +1,68 @@
+{
+  "name": "gestat",
+  "productName": "GESTAT",
+  "version": "1.0.0",
+  "description": "GESTAT - ventes et caisse (Videor, Casio)",
+  "author": "fabz91",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win nsis --x64"
+  },
+  "devDependencies": {
+    "electron": "31.7.7",
+    "electron-builder": "24.13.3",
+    "rcedit": "3.1.0"
+  },
+  "build": {
+    "appId": "fr.fabz91.gestat",
+    "productName": "GESTAT",
+    "copyright": "fabz91",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "core.js",
+      "preload.js",
+      "config.js",
+      "index.html",
+      "icon.png",
+      "icon.ico",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icon.ico",
+      "artifactName": "GESTAT-Installateur-${version}.${ext}",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
+      "installerHeaderIcon": "icon.ico",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "language": "1036",
+      "include": "installer.nsh"
+    },
+    "extraResources": [
+      {
+        "from": "icon.ico",
+        "to": "gestat-icone.ico"
+      }
+    ],
+    "afterPack": "./afterpack.js"
+  }
+}

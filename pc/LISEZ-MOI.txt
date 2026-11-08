@@ -1,0 +1,90 @@
+﻿GESTAT - marges et avoirs fournisseurs
+=======================================
+
+CE QUE CONTIENT CE DOSSIER
+  index.html              toute l'application GESTAT
+  main.js                 ouvre la fenêtre, lit et écrit les données sur le PC,
+                          gère l'export, l'import, l'impression et la mise à jour
+  core.js                 enregistrement des données et mise à jour (utilisé par main.js)
+  preload.js              relie la page à main.js de façon sécurisée (window.api)
+  config.js               réglages modifiables (adresse des mises à jour, synchronisation)
+  package.json            nom du logiciel, versions d'Electron et d'electron-builder,
+                          réglages de l'installateur (NSIS)
+  installer.nsh           réglages complémentaires de l'installateur
+  icon.ico / icon.png     l'icône
+  pdfjs\                 lecture du texte des factures PDF (pdf.js, Mozilla)
+  CREER-INSTALLATEUR.bat  le fichier à double-cliquer pour tout fabriquer
+
+
+À FAIRE UNE SEULE FOIS
+  1. Installez Node.js, version « LTS », depuis https://nodejs.org
+     Pendant l'installation, NE cochez PAS la case qui installe des outils
+     supplémentaires (« Tools for Native Modules ») : elle ouvre une longue
+     fenêtre PowerShell inutile.
+  2. Extrayez ce zip dans un dossier (par exemple Documents\GESTAT-source).
+  3. Double-cliquez sur CREER-INSTALLATEUR.bat.
+     Il lance « npm install » puis « npm run build ». Comptez quelques minutes,
+     avec une connexion internet.
+  4. L'installateur apparaît dans le dossier « dist » :
+     GESTAT-Installateur-1.5.0.exe. Lancez-le pour installer GESTAT.
+     Windows peut afficher « Windows a protégé votre ordinateur » (installateur
+     non signé) : cliquez sur « Informations complémentaires » puis
+     « Exécuter quand même ».
+  Pour réinstaller ou mettre à jour le programme lui-même, installez par-dessus :
+  les données sont conservées.
+
+
+OÙ SONT LES DONNÉES
+  Dans %APPDATA%\GESTAT\donnees : un fichier par magasin (gestat-bredis.json,
+  gestat-clamart.json) + gestat-commun.json (logo). Jamais dans le dossier du programme.
+  Réglages (roue dentée) > Dossier des données ouvre ce dossier.
+  Une copie de sécurité est faite chaque jour dans donnees\sauvegardes
+  (les 30 derniers jours sont gardés).
+  Au premier lancement, GESTAT reprend l'ancien fichier gestat.json s'il existe,
+  puis récupère tout seul les données de BREDIS et CLAMART en ligne (Supabase),
+  si config.js contient l'adresse et la clé. Il faut donc internet au premier lancement.
+  Réglages > Exporter crée une sauvegarde complète à garder sur une clé USB.
+
+
+MISE À JOUR SANS RÉINSTALLER (GitHub)
+  Réglages > Mettre à jour le logiciel : GESTAT lit version.json sur
+  https://github.com/fabz91/gestat ; si la version est plus récente, il télécharge
+  la nouvelle page index.html, vérifie qu'elle est complète, puis redémarre.
+  Les données ne sont pas touchées.
+  Une pastille rouge « 1 » sur la roue dentée et sur le bouton signale une nouvelle version.
+  
+  Il faut refaire l'installateur seulement si le programme Windows lui-même change
+  (icône, fenêtre, installation, config.js).
+
+
+SYNCHRONISER PLUSIEURS PC (Supabase, comme GESTIME)
+  1. Une seule fois : dans Supabase, menu « SQL Editor », collez le contenu de
+     supabase-gestat.sql puis « Run ». Cela crée la table « gestat »
+     (une ligne par magasin) sans toucher à GESTIME.
+  2. config.js doit contenir supabaseUrl et supabaseKey (mêmes valeurs que GESTIME)
+     avant de fabriquer l'installateur. Le bouton « Mettre à jour » ne change
+     jamais config.js : un PC déjà installé sans ces valeurs doit être réinstallé.
+  Le nuage en haut des Réglages est vert quand tout est synchronisé, rouge sinon.
+  Chaque modification part tout de suite ; les autres postes la reçoivent en
+  15 secondes. Si deux postes modifient en même temps, les deux saisies sont gardées.
+  Sans internet, les saisies restent sur le PC et partent au retour de la connexion.
+  Ne mettez JAMAIS la clé « secret » ou « service_role », seulement « publishable ».
+
+
+LECTURE DES FACTURES (version 86 et plus, nécessite ce kit)
+  Dans la Saisie, le bouton « 📄 Factures » lit les factures PDF du OneDrive de la
+  comptable (synchronisé sur ce PC) et propose de les ajouter dans la saisie.
+  1. Première fois : choisissez le dossier « Documents » du OneDrive compta
+     (celui qui contient 2026, et plus tard 2027), puis la date à partir de laquelle
+     les factures doivent être importées.
+  2. GESTAT lit tout seul les dossiers <année>\FOURNISSEURS et <année>\DIAPAR,
+     au démarrage puis toutes les 15 minutes. Rien n'est écrit sans validation.
+  3. Les fichiers ne sont jamais modifiés ni déplacés.
+  Le dossier choisi est noté dans %APPDATA%\GESTAT\factures.json.
+  Le dossier pdfjs contient pdf.js (Mozilla, licence Apache 2.0) qui lit le texte des PDF.
+
+
+RACCOURCIS UTILES DANS GESTAT
+  Ctrl+P  imprimer l'écran affiché
+  F5      recharger
+  Ctrl+Z / Ctrl+Y  annuler / rétablir (en dehors d'une case de saisie)
