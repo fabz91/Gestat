@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>GESTAT</title>
 <script>/* version web : réglages Supabase dans config.js (à côté de index.html). Programme PC : fournis par le programme. */if(!window.api)document.write('<script src="config.js"><\/script>')</script>
-<meta name="gs-version" content="3">
+<meta name="gs-version" content="4">
 <style>
 /* Layout (repris de GESTIME) : bandeau blanc [icône + titre + magasin ⌂] [logo] [⚙], rangée de 4 grands onglets verts, sélecteur de période, puis cartes coiffées d'un bandeau rouge. */
 :root{
@@ -419,6 +419,14 @@ svg.vtch{width:100%;height:auto;display:block}
 .lgb h2{margin:0;font-size:20px}.lgb p{margin:0 0 4px;font-size:13px;color:var(--muted)}
 #lg input{padding:10px;border:1px solid var(--line);border-radius:8px;font-size:15px;background:var(--bg);color:inherit}#lgm{font-size:13px;color:var(--bad,#d3262b);min-height:16px}
 .csf{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}.csf label{display:flex;flex-direction:column;font-size:12px;gap:3px}.csf input{padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:inherit;font:inherit}
+nav.tabs button[data-tab="controle"]{margin-left:14px;border-color:var(--red);color:var(--red)}
+nav.tabs button[data-tab="controle"][aria-selected="true"]{background:var(--red);color:#fff;box-shadow:0 2px 8px rgba(196,22,28,.35)}
+.ctk .kpi{cursor:pointer}.ctk .kpi.ctsel{outline:2px solid var(--red);outline-offset:-2px}
+.cthi{color:var(--red);font-weight:800}
+.ctt{display:inline-block;padding:1px 7px;border-radius:9px;font-size:11px;font-weight:700;background:var(--sunk);white-space:nowrap}
+.ct-annul,.ct-retour{background:#fde2e1;color:#9b1c1c}.ct-aband,.ct-cbab{background:#fff1d6;color:#8a5300}.ct-tiroir{background:#e6eefc;color:#1e3a8a}.ct-rem{background:#e5f5e8;color:#1f6b2c}
+.ctchips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px}
+.ctinfo{margin:4px 0 10px;color:var(--muted);font-size:13px}
 </style>
 </head>
 <body>
@@ -447,6 +455,7 @@ svg.vtch{width:100%;height:auto;display:block}
     <button role="tab" data-tab="fiche">Fiche article</button>
     <button role="tab" data-tab="abc">Classement ABC</button>
     <button role="tab" data-tab="alertes">Alertes</button>
+    <button role="tab" data-tab="controle">Contrôle caisse</button>
 </nav>
 <div class="menu" id="storeMenu" role="menu" hidden></div>
 
@@ -456,7 +465,7 @@ svg.vtch{width:100%;height:auto;display:block}
 <script>
 (function(){
 "use strict";
-const APP="GESTAT",APP_VERSION=3;
+const APP="GESTAT",APP_VERSION=4;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
@@ -507,7 +516,7 @@ const SYNC={cfg(){const c=window.SYNC&&window.SYNC.url&&window.SYNC.key&&!/VOTRE
 // Caisse de ce PC : le magasin dont les fichiers Videor sont sur ce PC (choisi une fois dans les réglages)
 let CA_CFG=null;
 function caCfg(){if(!CA_CFG){try{CA_CFG=JSON.parse(rawLoad("gestat-caisse")||"null")}catch(e){CA_CFG=null}CA_CFG=CA_CFG||{}}return CA_CFG}
-function caSet(mag){caCfg().mag=mag;rawSave("gestat-caisse",JSON.stringify(CA_CFG));VT.cache={};VT.load=null;render();setTimeout(()=>vtUpload(),1500)}
+function caSet(mag){caCfg().mag=mag;rawSave("gestat-caisse",JSON.stringify(CA_CFG));VT.cache={};VT.load=null;CTL.cache={};CTL.load=null;render();setTimeout(()=>vtUpload(),1500);setTimeout(()=>ctlUpload(),5000)}
 let CAISSE_ICI=null;async function caisseIci(){if(CAISSE_ICI!=null||!PC||!window.api.caLister)return CAISSE_ICI;try{const L=await window.api.caLister();CAISSE_ICI=!L.err&&(L.files||[]).length>0;S.caDir=L.dir;S.caCasio=L.casio||0}catch(e){CAISSE_ICI=false}if(CAISSE_ICI&&!caCfg().mag)render();return CAISSE_ICI}
 /* ================= v149 : onglet VENTE (journées de caisse Videor) =================
  Source : C:\transfert\reception\001\VENT.TOT.AAAAMMJJ (une journée par fichier, écrite par Videor chaque nuit).
@@ -592,6 +601,141 @@ async function vtUpload(){if(VT.up.busy||!VT_API()||!vtCfgSb()||!S.store||typeof
   catch(e){console.error(e);VT.up.msg="Envoi en ligne impossible : "+(e.message||e)}
   finally{VT.up.busy=false;const e=document.getElementById("vtUp");if(e)e.textContent=VT.up.msg}}
 if(VT_API()){setTimeout(vtUpload,45000);setInterval(vtUpload,15*60000)}
+// ===== v4 : CONTRÔLE CAISSE (journaux des tickets de la caisse Casio, fichiers 0205-CC_AAAAMMJJ.JRL) =====
+// Le PC du magasin lit les journaux copiés de la caisse (programme 1.1.x), en tire les opérations sensibles
+// (annulations de ligne, retours, abandons de ticket, tiroir sans vente, paiements carte abandonnés, remises)
+// et envoie un résumé par jour dans gesmar_ventes (magasin « bredis.ctl ») ; les autres appareils lisent ce résumé.
+function ctlParse(txt,caisse,iso){
+  const num=s=>{s=String(s||"").replace(/_/g,"").replace(/Eur|EUR|€/g,"").replace(",",".").trim();const v=parseFloat(s);return isFinite(v)?v:0};
+  const R={d:iso,c:caisse,n:0,ca:0,art:0,cais:{},ev:[],h:{}};
+  const blocs=[];let cur=[];
+  for(const raw of String(txt).split(/\r?\n/)){const l=raw.replace(/[\x00-\x1f]/g,"");
+    if(l.trim()==="H13"){if(cur.length)blocs.push(cur);cur=[];continue}
+    if(/^@[01]/.test(l))cur.push({k:l[1],t:l.slice(2).replace(/\s+$/,"")})}
+  if(cur.length)blocs.push(cur);
+  let lastFoot=null;
+  const C=n=>R.cais[n]||(R.cais[n]={n:0,ca:0,art:0,annul:0,annulMt:0,retour:0,retourMt:0,aband:0,abandMt:0,tiroir:0,cbab:0,cbabMt:0,rem:0,remMt:0});
+  for(const B of blocs){
+    // pied du ticket : « 19-02-2026 JEUDI   08:44 » puis « LAETITIA   R1 000205-01 3 »
+    let foot=null;
+    for(let i=0;i<B.length-1;i++){const m=/^(\d\d)-(\d\d)-(\d{4}) +\S+ +(\d\d:\d\d)$/.exec(B[i].t.trim());
+      if(m){const f=/^(.*?)\s+R\d+\s+\d{6}-\d\d\s+(\d+)$/.exec(B[i+1].t.trim());if(f){foot={h:m[4],cais:f[1].trim()||"?",tk:+f[2]};break}}}
+    const F=foot||lastFoot||{h:"",cais:"?",tk:0};if(foot)lastFoot=foot;
+    const ev=[];let val="",ean="",total=null,pay="",nart=0,st=0,attente=false;
+    for(let i=0;i<B.length;i++){const x=B[i],t=x.t.trim();
+      if(x.k==="1"){const v=/^-{3,}>\s*(.+)$/.exec(t);if(v){val=v[1].trim();continue}if(/^\d{8,14}$/.test(t))ean=t;continue}
+      let m;
+      if((m=/^SOUS-TOTAL\s+(-?[\d.]+)Eur$/.exec(t))){st=num(m[1]);continue}
+      if((m=/^TOTAL A PAYER\s+(\S+)$/.exec(t))){if(total==null)total=num(m[1]);const p=B[i+1]&&/^(.+?)\s{2,}\S*_\S*$/.exec(B[i+1].t.trim());if(p&&!pay.split(" + ").includes(p[1].trim()))pay=(pay?pay+" + ":"")+p[1].trim();continue} // paiement en plusieurs fois : 1er total = ticket
+      if((m=/^(\d+)Article\(s\)$/.exec(t))){nart=+m[1];continue}
+      if(/^ATTENTE\s+\d+$/.test(t)){attente=true;continue}
+      if((m=/^([A-Z][A-Z\/. ]+?)\s*-{5,}$/.exec(t))&&!/^-+$/.test(t)){const lib=m[1].trim();
+        const art=B.slice(i+1,i+4).map(y=>/^(.+?)\s+T\d\s+(-?[\d.]+)Eur$/.exec(y.t.trim())).find(Boolean);
+        if(/^ANNULATION LIGNE/.test(lib))ev.push({t:"annul",lib:art?art[1].trim():"",mt:art?Math.abs(num(art[2])):0,ean,val});
+        else if(/^RETOUR/.test(lib))ev.push({t:"retour",lib:art?art[1].trim():"",mt:art?Math.abs(num(art[2])):0,ean,val});
+        else if(/^ABANDON TICKET/.test(lib))ev.push({t:"aband",lib:"",mt:st,val});
+        else if(/^TIROIR/.test(lib))ev.push({t:"tiroir",lib:"",mt:0,val});
+        else ev.push({t:"autre",lib,mt:art?Math.abs(num(art[2])):0,val});
+        val="";continue}
+      if(/^ABANDON DEBIT$/.test(t)){let mt=0;for(let j=i+1;j<Math.min(B.length,i+14);j++){const mm=/^([\d.,]+) EUR$/.exec(B[j].t.trim());if(mm){mt=num(mm[1]);break}}ev.push({t:"cbab",lib:"Paiement carte abandonné",mt,val:""});continue}
+      if((m=/^TOTAL remise\s+(\S+)$/.exec(t))){ev.push({t:"rem",lib:"Remise immédiate",mt:num(m[1]),val:""});continue}
+    }
+    const c=C(F.cais);
+    if(total!=null&&!attente){R.n++;R.ca+=total;R.art+=nart;c.n++;c.ca+=total;c.art+=nart;const hh=F.h.slice(0,2);if(hh)R.h[hh]=(R.h[hh]||0)+1}
+    for(const e of ev){e.h=F.h;e.cais=F.cais;e.tk=F.tk;e.c=caisse;if(pay)e.pay=pay;if(total!=null)e.tot=total;
+      const k={annul:["annul","annulMt"],retour:["retour","retourMt"],aband:["aband","abandMt"],tiroir:["tiroir",null],cbab:["cbab","cbabMt"],rem:["rem","remMt"]}[e.t];
+      if(k){c[k[0]]++;if(k[1])c[k[1]]+=e.mt}
+      if(!e.val)delete e.val;if(!e.ean)delete e.ean;if(!e.lib)delete e.lib;R.ev.push(e)}
+  }
+  R.ca=Math.round(R.ca*100)/100;for(const k in R.cais){const c=R.cais[k];for(const f in c)if(typeof c[f]==="number")c[f]=Math.round(c[f]*100)/100}
+  return R}
+
+const CTL={cache:{},load:null,up:{busy:false,msg:""},f:{t:"",cais:"",lim:300}};
+const CT_T={annul:["Annulations de ligne","Annulation"],retour:["Retours / remboursements","Retour"],aband:["Abandons de ticket","Abandon ticket"],tiroir:["Tiroir sans vente","Tiroir"],cbab:["Paiements carte abandonnés","Carte abandonnée"],rem:["Remises immédiates","Remise"],autre:["Autres opérations","Autre"]};
+const ctlLocal=()=>!!(PC&&window.api&&window.api.casioLister&&typeof caCfg==="function"&&S.store===caCfg().mag);
+async function ctlJrl(){const L=await window.api.casioLister("jrl"),by={};
+  (L||[]).forEach(f=>{const m=/^.+?-(\d\d)_(\d{4})(\d\d)(\d\d)\.jrl$/i.exec(f.nom);if(!m)return;const d=m[2]+"-"+m[3]+"-"+m[4];(by[d]=by[d]||[]).push(Object.assign({c:m[1]},f))});return by}
+function ctlMerge(d,parts){const D={d,v:1,n:0,ca:0,art:0,caisses:{},cais:{},ev:[],h:{}};
+  for(const R of parts){D.n+=R.n;D.ca+=R.ca;D.art+=R.art;D.caisses[R.c]={n:R.n,ca:R.ca};
+    for(const k in R.h)D.h[k]=(D.h[k]||0)+R.h[k];
+    for(const nm in R.cais){const c=R.cais[nm];if(!c.n&&!Object.keys(c).some(f=>f!=="n"&&c[f]))continue;const t=D.cais[nm]||(D.cais[nm]={});for(const f in c)t[f]=Math.round(((t[f]||0)+c[f])*100)/100}
+    R.ev.forEach(e=>D.ev.push(e))}
+  D.ev.sort((u,w)=>u.h<w.h?-1:u.h>w.h?1:0);D.ca=Math.round(D.ca*100)/100;return D}
+async function ctlJour(d,files){const parts=[];for(const f of files){try{parts.push(ctlParse(await window.api.casioLire("jrl/"+f.nom),f.c,d))}catch(e){console.error(e)}}return parts.length?ctlMerge(d,parts):null}
+async function ctlGet(a,b){const mag=S.store,want=vtDays(a,b).filter(d=>!(mag+"|"+d in CTL.cache));
+  if(want.length){
+    let rest=want;
+    // PC du magasin : on relit sur place seulement les journées pas encore envoyées en ligne (lire 4 journaux par jour est long)
+    if(ctlLocal()){const by=await ctlJrl(),I=ctlUpIdx();rest=[];
+      for(const d of want){const fs=(by[d]||[]).filter(f=>!/_MNG_/i.test(f.nom)),sig=fs.map(f=>f.nom+":"+f.size+":"+f.mtime).sort().join(",");
+        if(fs.length&&I[mag+"|"+d]===sig&&vtCfgSb())rest.push(d);else CTL.cache[mag+"|"+d]=fs.length?await ctlJour(d,fs):null}}
+    if(rest.length&&vtCfgSb()){const want=rest;for(let i=0;i<want.length;i+=31){const x=want[i],y=want[Math.min(i+30,want.length-1)];
+      const rows=await vtSb("gesmar_ventes?magasin=eq."+encodeURIComponent(mag+".ctl")+"&jour=gte."+x+"&jour=lte."+y+"&select=jour,data&order=jour");
+      const got=new Set();(rows||[]).forEach(r=>{CTL.cache[mag+"|"+r.jour]=r.data;got.add(r.jour)});
+      want.slice(i,i+31).forEach(d=>{if(!got.has(d)&&d<todayISO())CTL.cache[mag+"|"+d]=null})}}}
+  return vtDays(a,b).map(d=>CTL.cache[mag+"|"+d]).filter(Boolean)}
+let CTL_UP=null;function ctlUpIdx(){if(!CTL_UP){try{CTL_UP=JSON.parse(rawLoad("gestat-envoi-ctl")||"{}")||{}}catch(e){CTL_UP={}}}return CTL_UP}
+async function ctlUpload(){if(CTL.up.busy||!(PC&&window.api&&window.api.casioLister)||!vtCfgSb()||typeof caCfg!=="function")return;const mag=caCfg().mag;if(!mag)return;CTL.up.busy=true;
+  try{const by=await ctlJrl(),I=ctlUpIdx();
+    const todo=Object.keys(by).map(d=>{const fs=by[d].filter(f=>!/_MNG_/i.test(f.nom));return{d,fs,sig:fs.map(f=>f.nom+":"+f.size+":"+f.mtime).sort().join(",")}}).filter(x=>x.fs.length&&I[mag+"|"+x.d]!==x.sig).sort((u,w)=>u.d<w.d?1:-1);
+    let n=0;for(let i=0;i<todo.length;i+=5){const part=todo.slice(i,i+5),rows=[];
+      for(const x of part){const D=await ctlJour(x.d,x.fs);if(D){CTL.cache[mag+"|"+x.d]=D;rows.push({id:mag+".ctl|"+x.d,magasin:mag+".ctl",jour:x.d,data:D,updated_at:new Date().toISOString()})}await new Promise(r=>setTimeout(r,0))}
+      if(rows.length)await vtSb("gesmar_ventes?on_conflict=id",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(rows)});
+      part.forEach(x=>I[mag+"|"+x.d]=x.sig);try{rawSave("gestat-envoi-ctl",JSON.stringify(I))}catch(e){}
+      n+=part.length;CTL.up.msg="Envoi des journaux de tickets : "+n+" / "+todo.length;const el=document.getElementById("ctUp");if(el)el.textContent=CTL.up.msg}
+    CTL.up.msg=""}
+  catch(e){console.error(e);CTL.up.msg="Envoi des journaux impossible : "+(e.message||e)}
+  finally{CTL.up.busy=false;const el=document.getElementById("ctUp");if(el)el.textContent=CTL.up.msg}}
+if(PC&&window.api&&window.api.casioLister){setTimeout(ctlUpload,90000);setInterval(ctlUpload,15*60000)}
+// ---- regroupement d'une période ----
+function ctlAgg(days){const A={n:days.length,tk:0,ca:0,art:0,cais:{},ev:[],tot:{}};
+  for(const D of days){A.tk+=D.n;A.ca+=D.ca;A.art+=D.art;for(const nm in D.cais){const c=D.cais[nm],t=A.cais[nm]||(A.cais[nm]={nm,j:0});t.j++;for(const f in c)t[f]=(t[f]||0)+c[f]}
+    D.ev.forEach(e=>{A.ev.push(Object.assign({d:D.d},e));const t=A.tot[e.t]||(A.tot[e.t]={n:0,mt:0});t.n++;t.mt+=e.mt||0})}
+  return A}
+// Points à vérifier (règles simples, inspirées des logiciels « anti-perte ») : chaque ligne dit pourquoi.
+function ctlAVerifier(A){const out=[];
+  A.ev.forEach(e=>{const r=[];const esp=/ESPECES/i.test(e.pay||"");
+    if(e.t==="annul"){if(esp)r.push("annulation sur un ticket payé en espèces");if(e.mt>=10)r.push("annulation de "+vtE(e.mt));if(!e.val)r.push("annulation sans validation")}
+    else if(e.t==="retour"){r.push(esp?"remboursement en espèces":"retour / remboursement")}
+    else if(e.t==="aband"&&e.mt>=15)r.push("ticket abandonné de "+vtE(e.mt));
+    else if(e.t==="autre")r.push("opération « "+(e.lib||"?")+" »");
+    if(r.length)out.push(Object.assign({pq:r.join(" · ")},e))});
+  // tiroir ouvert sans vente : seulement quand un caissier en a beaucoup dans la journée
+  const tj={};A.ev.filter(e=>e.t==="tiroir").forEach(e=>{const k=e.d+"|"+e.cais;(tj[k]=tj[k]||[]).push(e)});
+  Object.values(tj).forEach(L=>{if(L.length>=10)out.push(Object.assign({pq:L.length+" ouvertures du tiroir sans vente dans la journée"},L[0],{h:L[0].h+"–"+L[L.length-1].h,tk:""}))});
+  return out.sort((u,w)=>(u.d+u.h<w.d+w.h?1:-1))}
+function ctlRow(e,why){const T=CT_T[e.t]||CT_T.autre;
+  return `<tr><td class="l">${esc(vtDl(e.d))}</td><td>${esc(e.h||"")}</td><td>${esc(e.c||"")}</td><td class="l">${esc(e.cais||"")}</td><td>${e.tk||""}</td><td class="l"><span class="ctt ct-${e.t}">${esc(T[1])}</span></td><td class="l">${esc(why?e.pq:(e.lib||""))}</td><td>${e.mt?vtE(e.mt):""}</td><td class="l">${esc(e.pay||"")}</td><td class="l">${esc(e.val||"")}</td></tr>`}
+const CT_HEAD=`<thead><tr><th class="l">Jour</th><th>Heure</th><th>Caisse</th><th class="l">Caissier</th><th>Ticket</th><th class="l">Opération</th><th class="l">Détail</th><th>Montant</th><th class="l">Paiement</th><th class="l">Validé par</th></tr></thead>`;
+function vCtl(a,b){const key=S.store+"|"+a+"|"+b;
+  if(!CTL.load||CTL.load.key!==key){CTL.load={key,etat:"cours",days:null,err:""};
+    ctlGet(a,b).then(d=>{if(CTL.load.key===key){CTL.load.days=d;CTL.load.etat="ok"}}).catch(e=>{if(CTL.load.key===key){CTL.load.etat="err";CTL.load.err=e.message||String(e)}}).finally(()=>render())}
+  const up=`<div id="ctUp" class="vtup">${esc(CTL.up.msg||"")}</div>`;
+  if(CTL.load.etat==="cours")return up+`<div class="empty-state">Lecture des journaux de tickets…</div>`;
+  if(CTL.load.etat==="err")return up+`<div class="empty-state">${esc(CTL.load.err)}</div>`;
+  const days=CTL.load.days||[];
+  if(!days.length)return up+`<div class="empty-state">Aucun journal de tickets pour ${S.vt.mode==="jour"?"le "+esc(vtDl(S.vt.d)):"cette période"}.<br><small>${ctlLocal()?"Les journaux viennent de la caisse Casio (Réglages → Caisse Casio). La caisse les garde depuis le 19/02/2026.":"Les journaux sont envoyés en ligne par le PC du magasin (programme GESTAT 1.1 avec la caisse Casio)."}</small></div>`;
+  const A=ctlAgg(days),f=CTL.f,T=A.tot,pc=x=>A.ca?vtP(x/A.ca):"";
+  const k=(t,sub)=>{const x=T[t]||{n:0,mt:0};return `<div class="kpi vtclk${f.t===t?" ctsel":""}" data-ct="t" data-v="${t}" title="Voir le détail"><div class="lbl">${CT_T[t][0]}</div><div class="v">${x.n}</div><div class="d">${sub(x)}</div></div>`};
+  const kp=`<div class="grid kpis vtk ctk">${k("annul",x=>vtE(x.mt)+(x.mt?" · "+pc(x.mt)+" du CA":""))}${k("retour",x=>vtE(x.mt))}${k("aband",x=>vtE(x.mt)+" d'articles")}${k("tiroir",()=>"ouvertures sans vente")}${k("cbab",x=>vtE(x.mt))}${k("rem",x=>vtE(x.mt))}</div>`;
+  // caissiers : comparés à la moyenne des autres
+  const C=Object.values(A.cais).filter(c=>c.n||c.annul||c.tiroir||c.aband||c.retour);
+  const rate=(c,f2)=>c.n?(c[f2]||0)/c.n:0;
+  const avg=(f2,me)=>{const o=C.filter(c=>c!==me&&c.n>=20);const n=o.reduce((s,c)=>s+c.n,0);return n?o.reduce((s,c)=>s+(c[f2]||0),0)/n:0};
+  const hi=(c,f2)=>{const r=rate(c,f2),m=avg(f2,c);return c.n>=20&&(c[f2]||0)>=3&&(m>0?r>=2*m:(c[f2]||0)>=5&&C.some(o=>o!==c&&o.n>=20))};
+  const cell=(c,f2,mt)=>`<td class="${hi(c,f2)?"cthi":""}" title="${hi(c,f2)?"Plus de 2 fois la moyenne des autres caissiers":""}">${c[f2]||0}${mt&&c[mt]?" · "+vtE(c[mt]):""}</td>`;
+  const tc=`<div class="panel flush vtg"><div class="band">Par caissier <span class="vtsub">en rouge : plus de 2 fois la moyenne des autres</span></div><div class="scroll"><table><thead><tr><th class="l">Caissier</th><th>Tickets</th><th>CA</th><th>Panier</th><th>Annulations</th><th>% du CA annulé</th><th>Retours</th><th>Abandons</th><th>Tiroir sans vente</th><th>Cartes abandonnées</th><th>Remises</th></tr></thead><tbody>
+    ${C.sort((u,w)=>w.ca-u.ca).map(c=>`<tr class="vtclk" data-ct="cais" data-v="${esc(c.nm)}"><td class="l"><b>${esc(c.nm)}</b>${A.n>1?` <small>${c.j} j</small>`:""}</td><td>${c.n||0}</td><td>${vtE(c.ca||0)}</td><td>${c.n?vtE(c.ca/c.n):"—"}</td>${cell(c,"annul","annulMt")}<td>${c.ca?vtP((c.annulMt||0)/c.ca):"—"}</td>${cell(c,"retour","retourMt")}${cell(c,"aband","abandMt")}${cell(c,"tiroir")}${cell(c,"cbab","cbabMt")}${cell(c,"rem","remMt")}</tr>`).join("")}</tbody></table></div></div>`;
+  const AV=ctlAVerifier(A);
+  const av=`<div class="panel flush vtg"><div class="band">À vérifier <span class="vtsub">${AV.length} ligne${AV.length>1?"s":""}</span></div>${AV.length?`<div class="scroll"><table>${CT_HEAD}<tbody>${AV.slice(0,200).map(e=>ctlRow(e,1)).join("")}</tbody></table></div>`:`<div class="empty-state" style="padding:14px">Rien de particulier.</div>`}</div>`;
+  let J=A.ev.slice().reverse();if(f.t)J=J.filter(e=>e.t===f.t);if(f.cais)J=J.filter(e=>e.cais===f.cais);
+  const chips=`<div class="ctchips"><button class="btn small${!f.t?" primary":""}" data-ct="t" data-v="">Tout</button>${Object.keys(CT_T).filter(t=>T[t]).map(t=>`<button class="btn small${f.t===t?" primary":""}" data-ct="t" data-v="${t}">${CT_T[t][1]} (${T[t].n})</button>`).join("")}
+    ${f.cais?`<button class="btn small primary" data-ct="cais" data-v="">${esc(f.cais)} ✕</button>`:""}</div>`;
+  const jr=`<div class="panel flush vtg"><div class="band">Journal des opérations <span class="vtsub">${J.length} ligne${J.length>1?"s":""}</span></div>${chips}${J.length?`<div class="scroll"><table>${CT_HEAD}<tbody>${J.slice(0,f.lim).map(e=>ctlRow(e)).join("")}</tbody></table></div>${J.length>f.lim?`<div style="padding:10px;text-align:center"><button class="btn small" data-ct="plus">Afficher plus</button></div>`:""}`:`<div class="empty-state" style="padding:14px">Aucune opération.</div>`}</div>`;
+  const info=`<div class="ctinfo">${A.n>1?A.n+" jours · ":""}${A.tk} tickets · ${vtE(A.ca)} encaissés${days.length?" · caisses "+[...new Set(days.flatMap(D=>Object.keys(D.caisses||{})))].sort().join(", "):""}</div>`;
+  return up+info+kp+av+tc+jr}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-ct]");if(!b)return;const k=b.dataset.ct,v=b.dataset.v,f=CTL.f;
+  if(k==="t"){f.t=f.t===v&&v?"":v;f.lim=300}else if(k==="cais"){f.cais=f.cais===v?"":v;f.lim=300}else if(k==="plus")f.lim+=300;render()});
 // ---- regroupement d'une période ----
 function vtAgg(days){const A={n:days.length,days,ca:0,cli:0,nart:0,rem:0,pay:{},ops:{},tva:{},ray:{},fam:{},sf:{},h:{},art:{},jour:[]};
   const add=(o,k,nm,q,ca,x,extra)=>{const e=o[k]||(o[k]={k,nm,q:0,ca:0,x,nj:0,last:""});e.q+=q;e.ca+=ca;if(nm)e.nm=nm;if(x!=null&&x!=="")e.x=x;if(extra)extra(e)};
@@ -627,6 +771,7 @@ function vVente(){const v=S.vt,[a,b]=vtRange(),key=S.store+"|"+a+"|"+b;
     :`<div class="vtdate">du <input type="date" id="vtA" value="${v.a}"> au <input type="date" id="vtB" value="${v.b}" max="${todayISO()}"> ${[["7","7 j"],["30","30 j"],["m","Ce mois"],["mp","Mois dernier"],["an","Cette année"]].map(x=>`<button class="btn small" data-vt="vite" data-v="${x[0]}">${x[1]}</button>`).join("")}</div>`}
     </div>
     <div id="vtUp" class="vtup">${esc(VT.up.msg||"")}</div>`;
+  if(v.vue==="controle")return top+vCtl(a,b); // v4
   if(!VT.load||VT.load.key!==key){VT.load={key,etat:"cours",days:null,err:""};
     vtGet(a,b).then(d=>{if(VT.load.key===key){VT.load.days=d;VT.load.etat="ok"}}).catch(e=>{if(VT.load.key===key){VT.load.etat="err";VT.load.err=e.message||String(e)}}).finally(()=>{if(true)render()})}
   if(VT.load.etat==="cours")return top+`<div class="empty-state">Lecture des journées de caisse…</div>`;
@@ -772,7 +917,7 @@ function exportJson(){return JSON.stringify({app:APP,version:APP_VERSION,exporte
 async function autoBk(){try{if(PC&&window.api.autoBackup)await window.api.autoBackup(exportJson())}catch(e){}}
 if(PC&&window.api.autoBackup){setTimeout(autoBk,60000);setInterval(autoBk,2*3600e3)}
 // ---- rendu ----
-const TABS=[["synth","Synthèse"],["rayons","Rayons et familles"],["articles","Articles"],["heures","Heures"],["fiche","Fiche article"],["abc","Classement ABC"],["alertes","Alertes"]];
+const TABS=[["synth","Synthèse"],["rayons","Rayons et familles"],["articles","Articles"],["heures","Heures"],["fiche","Fiche article"],["abc","Classement ABC"],["alertes","Alertes"],["controle","Contrôle caisse"]];
 function render(){if(!TABS.some(t=>t[0]===S.tab))S.tab="synth";S.vt.vue=S.tab;
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===S.tab));
   $("#storeName").textContent=storeNom();$("#gearPas").hidden=!S.majNew;
@@ -801,7 +946,7 @@ function csSection(){const i=CS.info||{},f=CS.f;
      ${i.regle?`<button class="btn small" data-gs="csCopie" ${CS.busy||(CS.prog&&CS.prog.etape==="copie")?"disabled":""}>Copier maintenant</button>`:""}</div>
     ${CS.msg?`<div style="margin-top:6px;white-space:pre-line">${esc(CS.msg)}</div>`:""}
     <div style="margin-top:6px;font-size:12px;opacity:.75">Lecture seule : GESTAT ne modifie jamais rien sur la caisse. Le mot de passe reste chiffré sur ce PC. Copie automatique toutes les 3 heures.</div></div>`}
-function csFin(){CAISSE_ICI=null;VT_LIST=null;VT.cache={};VT.load=null;caisseIci().then(()=>{render();setTimeout(()=>vtUpload(),1500)})}
+function csFin(){CAISSE_ICI=null;VT_LIST=null;VT.cache={};VT.load=null;CTL.cache={};CTL.load=null;caisseIci().then(()=>{render();setTimeout(()=>vtUpload(),1500);setTimeout(()=>ctlUpload(),5000)})}
 async function csTest(){const f=CS.f;CS.busy=true;CS.msg="Test en cours…";renderModal();
   try{await window.api.casioRegler({hote:f.hote!=null?f.hote:(CS.info&&CS.info.hote)||"192.168.1.110",user:f.user!=null?f.user:(CS.info&&CS.info.user)||"",pass:f.pass||""});
     CS.f={};const r=await window.api.casioTester();
@@ -845,7 +990,7 @@ document.addEventListener("click",async e=>{
   if(e.target.closest("#gearBtn")){S.modal=true;if(!S.majMsg)majCheck(false).then(renderModal);if(csOk())csRefresh().then(()=>{if(S.modal)renderModal()});renderModal();return}
   const b=e.target.closest("[data-gs]");if(!b){if(!e.target.closest("#storeMenu"))storeMenu(false);return}
   const k=b.dataset.gs,v=b.dataset.v;
-  if(k==="store"){S.store=v;try{localStorage.setItem("gestat.store",v)}catch(_){}storeMenu(false);VT.load=null;render()}
+  if(k==="store"){S.store=v;try{localStorage.setItem("gestat.store",v)}catch(_){}storeMenu(false);VT.load=null;CTL.load=null;render()}
   else if(k==="close"){S.modal=false;renderModal()}
   else if(k==="caisse"){caSet(v);toast("Caisse de ce PC : "+storeNom(v))}
   else if(k==="dossier"){if(window.api&&window.api.caChoisir){const d=await window.api.caChoisir();if(d){CAISSE_ICI=null;VT_LIST=null;await caisseIci();VT.cache={};VT.load=null;render()}}}
