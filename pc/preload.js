@@ -25,6 +25,14 @@ contextBridge.exposeInMainWorld('api', {
   caLister: () => ipcRenderer.invoke('gm:caLister'),
   caLire: (nom) => ipcRenderer.invoke('gm:caLire', nom),
   caChoisir: () => ipcRenderer.invoke('gm:caChoisir'),
-  venteLire: (nom) => ipcRenderer.invoke('gm:venteLire', nom)
+  venteLire: (nom) => ipcRenderer.invoke('gm:venteLire', nom),
+  // 1.1.0 : caisse Casio (lecture seule)
+  casioInfos: () => ipcRenderer.invoke('gm:casioInfos'),
+  casioRegler: (o) => ipcRenderer.invoke('gm:casioRegler', o),
+  casioTester: () => ipcRenderer.invoke('gm:casioTester'),
+  casioCopier: () => ipcRenderer.invoke('gm:casioCopier'),
+  casioLister: (quoi) => ipcRenderer.invoke('gm:casioLister', quoi),
+  casioLire: (rel) => ipcRenderer.invoke('gm:casioLire', rel),
+  onCasioProg: (fn) => { ipcRenderer.removeAllListeners('gm:casioProg'); ipcRenderer.on('gm:casioProg', (e, p) => { try { fn(p); } catch (_) {} }); }
 });
 contextBridge.exposeInMainWorld('SYNC', { updateUrl: cfg.updateUrl || '', url: cfg.supabaseUrl || '', key: cfg.supabaseKey || '' });

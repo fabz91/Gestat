@@ -1,10 +1,11 @@
 'use strict';
 // GESTAT - programme Windows : ouvre la fenêtre, lit/écrit les données sur le PC,
 // gère l'export, l'import, l'impression, la mise à jour depuis GitHub et (v86) la lecture du dossier des factures.
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu, net } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, net, safeStorage } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { createCore } = require('./core');
+const { createCasio } = require('./casio');
 
 if (!app.requestSingleInstanceLock()) { app.quit(); }
 
@@ -127,11 +128,14 @@ ipcMain.handle('gm:facOuvrir', async (e, rel) => shell.openPath(facSafe(rel)));
 function caDir() { return facCfg().caisse || 'C:\\transfert\\reception\\001'; }
 const CA_NOM = /^VENT\.TOT\.\d{8}$/i;
 ipcMain.handle('gm:caLister', async () => {
-  const d = caDir(); let n = [];
-  try { n = await fs.promises.readdir(d); } catch (e) { return { dir: d, err: 'absent' }; }
-  const files = [];
-  for (const f of n) { if (!CA_NOM.test(f)) continue; try { const st = await fs.promises.stat(path.join(d, f)); if (st.isFile()) files.push({ nom: f, size: st.size, mtime: Math.round(st.mtimeMs) }); } catch (_) {} }
-  return { dir: d, files };
+  const d = caDir(); let n = [], err = '';
+  try { n = await fs.promises.readdir(d); } catch (e) { err = 'absent'; }
+  const files = [], vus = new Set();
+  for (const f of n) { if (!CA_NOM.test(f)) continue; try { const st = await fs.promises.stat(path.join(d, f)); if (st.isFile()) { files.push({ nom: f, size: st.size, mtime: Math.round(st.mtimeMs) }); vus.add(f.toUpperCase()); } } catch (_) {} }
+  // 1.1.0 : journées copiées depuis la caisse Casio (même fichier que celui de Videor) : complètent l'historique.
+  let nc = 0; try { for (const f of casio.ventes()) if (!vus.has(f.nom.toUpperCase())) { files.push(f); nc++; } } catch (_) {}
+  if (err && !nc) return { dir: d, err };
+  return { dir: d, files, casio: nc };
 });
 ipcMain.handle('gm:caLire', async (e, nom) => {
   if (!CA_NOM.test(String(nom))) throw new Error('Nom refusé');
@@ -141,7 +145,8 @@ ipcMain.handle('gm:caLire', async (e, nom) => {
 // 1.5.0 : onglet VENTE : la journée de caisse complète (rayons, familles, articles, heures…). Lecture seule.
 ipcMain.handle('gm:venteLire', async (e, nom) => {
   if (!CA_NOM.test(String(nom))) throw new Error('Nom refusé');
-  return fs.promises.readFile(path.join(caDir(), String(nom)), 'latin1');
+  try { return await fs.promises.readFile(path.join(caDir(), String(nom)), 'latin1'); }
+  catch (err) { const d = String(nom).slice(-8); return fs.promises.readFile(casio.chemin('jours/' + d + '/vent.tot'), 'latin1'); }
 });
 ipcMain.handle('gm:caChoisir', async () => {
   const c = facCfg();
@@ -149,6 +154,21 @@ ipcMain.handle('gm:caChoisir', async () => {
   if (r.canceled || !r.filePaths[0]) return '';
   c.caisse = r.filePaths[0]; fs.writeFileSync(facCfgPath, JSON.stringify(c, null, 1), 'utf8'); return c.caisse;
 });
+
+// ===== 1.1.0 : caisse Casio (ftp, LECTURE SEULE) =====
+// Copie sur ce PC les journées (environ 2 ans), les journaux des tickets et le fichier des articles.
+// Réglages : adresse, identifiant, mot de passe (chiffré par Windows, ne quitte jamais ce PC).
+const casio = createCasio({ dataDir, safeStorage, log: (k, e) => { try { console.error(k, e); } catch (_) {} } });
+function casioProg(p) { try { if (win && !win.isDestroyed()) win.webContents.send('gm:casioProg', p); } catch (e) {} }
+ipcMain.handle('gm:casioInfos', async () => casio.infos());
+ipcMain.handle('gm:casioRegler', async (e, o) => casio.regler(o || {}));
+ipcMain.handle('gm:casioTester', async () => { try { return await casio.tester(); } catch (err) { return { ok: false, erreur: err.message || String(err) }; } });
+ipcMain.handle('gm:casioCopier', async () => casio.copier(casioProg));
+ipcMain.handle('gm:casioLister', async (e, quoi) => casio.lister(String(quoi || '')));
+ipcMain.handle('gm:casioLire', async (e, rel) => fs.promises.readFile(casio.chemin(rel), 'latin1'));
+// Copie automatique : 2 minutes après l'ouverture, puis toutes les 3 heures (seulement ce qui manque).
+function casioAuto() { try { const i = casio.infos(); if (i.regle && i.actif) casio.copier(casioProg).catch(() => {}); } catch (e) {} }
+
 // pdf.js (lecture des PDF), fourni avec le programme dans le dossier pdfjs
 ipcMain.handle('gm:pdfjs', async () => ({
   lib: fs.readFileSync(path.join(appDir, 'pdfjs', 'pdf.min.mjs'), 'utf8'),
@@ -160,5 +180,6 @@ app.whenReady().then(() => {
   if (process.platform === 'win32') app.setAppUserModelId('fr.fabz91.gestat');
   Menu.setApplicationMenu(null);
   createWindow();
+  setTimeout(casioAuto, 2 * 60 * 1000); setInterval(casioAuto, 3 * 60 * 60 * 1000);
 });
 app.on('window-all-closed', () => app.quit());

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>GESTAT</title>
 <script>/* version web : réglages Supabase dans config.js (à côté de index.html). Programme PC : fournis par le programme. */if(!window.api)document.write('<script src="config.js"><\/script>')</script>
-<meta name="gs-version" content="2">
+<meta name="gs-version" content="3">
 <style>
 /* Layout (repris de GESTIME) : bandeau blanc [icône + titre + magasin ⌂] [logo] [⚙], rangée de 4 grands onglets verts, sélecteur de période, puis cartes coiffées d'un bandeau rouge. */
 :root{
@@ -418,6 +418,7 @@ svg.vtch{width:100%;height:auto;display:block}
 .lgb{display:flex;flex-direction:column;gap:10px;width:min(340px,100%);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
 .lgb h2{margin:0;font-size:20px}.lgb p{margin:0 0 4px;font-size:13px;color:var(--muted)}
 #lg input{padding:10px;border:1px solid var(--line);border-radius:8px;font-size:15px;background:var(--bg);color:inherit}#lgm{font-size:13px;color:var(--bad,#d3262b);min-height:16px}
+.csf{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}.csf label{display:flex;flex-direction:column;font-size:12px;gap:3px}.csf input{padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:inherit;font:inherit}
 </style>
 </head>
 <body>
@@ -455,7 +456,7 @@ svg.vtch{width:100%;height:auto;display:block}
 <script>
 (function(){
 "use strict";
-const APP="GESTAT",APP_VERSION=2;
+const APP="GESTAT",APP_VERSION=3;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
@@ -507,7 +508,7 @@ const SYNC={cfg(){const c=window.SYNC&&window.SYNC.url&&window.SYNC.key&&!/VOTRE
 let CA_CFG=null;
 function caCfg(){if(!CA_CFG){try{CA_CFG=JSON.parse(rawLoad("gestat-caisse")||"null")}catch(e){CA_CFG=null}CA_CFG=CA_CFG||{}}return CA_CFG}
 function caSet(mag){caCfg().mag=mag;rawSave("gestat-caisse",JSON.stringify(CA_CFG));VT.cache={};VT.load=null;render();setTimeout(()=>vtUpload(),1500)}
-let CAISSE_ICI=null;async function caisseIci(){if(CAISSE_ICI!=null||!PC||!window.api.caLister)return CAISSE_ICI;try{const L=await window.api.caLister();CAISSE_ICI=!L.err&&(L.files||[]).length>0;S.caDir=L.dir}catch(e){CAISSE_ICI=false}if(CAISSE_ICI&&!caCfg().mag)render();return CAISSE_ICI}
+let CAISSE_ICI=null;async function caisseIci(){if(CAISSE_ICI!=null||!PC||!window.api.caLister)return CAISSE_ICI;try{const L=await window.api.caLister();CAISSE_ICI=!L.err&&(L.files||[]).length>0;S.caDir=L.dir;S.caCasio=L.casio||0}catch(e){CAISSE_ICI=false}if(CAISSE_ICI&&!caCfg().mag)render();return CAISSE_ICI}
 /* ================= v149 : onglet VENTE (journées de caisse Videor) =================
  Source : C:\transfert\reception\001\VENT.TOT.AAAAMMJJ (une journée par fichier, écrite par Videor chaque nuit).
  Lignes : 050 totaux (C.A BRUT = CA TTC + nb articles, C.A NET = nb clients, REMISE IMMEDIATE), 051 paiements,
@@ -775,16 +776,57 @@ const TABS=[["synth","Synthèse"],["rayons","Rayons et familles"],["articles","A
 function render(){if(!TABS.some(t=>t[0]===S.tab))S.tab="synth";S.vt.vue=S.tab;
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===S.tab));
   $("#storeName").textContent=storeNom();$("#gearPas").hidden=!S.majNew;
-  const ask=PC&&CAISSE_ICI&&!caCfg().mag?`<div class="gsask"><b>Ce PC a les journées de caisse de Videor.</b> De quel magasin est cette caisse ? <button class="btn primary small" data-gs="caisse" data-v="bredis">BREDIS</button> <button class="btn primary small" data-gs="caisse" data-v="clamart">CLAMART</button></div>`:"";
+  const ask=PC&&CAISSE_ICI&&!caCfg().mag?`<div class="gsask"><b>Ce PC a les journées de caisse (Videor ou caisse Casio).</b> De quel magasin est cette caisse ? <button class="btn primary small" data-gs="caisse" data-v="bredis">BREDIS</button> <button class="btn primary small" data-gs="caisse" data-v="clamart">CLAMART</button></div>`:"";
   $("#app").innerHTML=ask+vVente();renderModal()}
+// ===== v3 (programme PC 1.1.0) : caisse Casio du magasin, LECTURE SEULE =====
+// Le programme PC copie de la caisse (ftp) : les journées (dossiers JJMMAAAA, environ 2 ans), les journaux des tickets (.JRL)
+// et le fichier des articles. Les journées complètent celles de Videor (même fichier) et partent en ligne comme elles.
+const CS={info:null,prog:null,msg:"",busy:false,f:{}};
+const csOk=()=>!!(PC&&window.api&&window.api.casioInfos);
+async function csRefresh(){if(!csOk())return;try{CS.info=await window.api.casioInfos()}catch(e){CS.info=null}}
+function csDate(iso){if(!iso)return"";const d=new Date(iso);return d.toLocaleDateString("fr-FR")+" à "+d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}
+function csEtatTxt(){const i=CS.info||{},e=i.etat||{},p=CS.prog||i.progression;
+  if(p&&p.etape!=="fini"&&p.etape!=="erreur")return p.etape==="connexion"?"Connexion à la caisse…":"Copie en cours : "+p.n+" / "+p.tot+(p.nouveaux?" ("+p.nouveaux+" nouvelles journées)":"");
+  if(!i.regle)return"Pas encore réglée.";
+  let t=e.derniere?"Dernière copie le "+csDate(e.derniere)+" : "+(e.jours||0)+" journées et "+(e.jrl||0)+" journaux de tickets sur ce PC.":"Aucune copie pour l'instant.";
+  if(e.ok===false&&e.erreur)t+="\n⚠ Dernier essai le "+csDate(e.derniereTentative)+" : "+e.erreur;return t}
+function csSection(){const i=CS.info||{},f=CS.f;
+  const v=(k,d)=>esc(f[k]!=null?f[k]:d);
+  return `<h4>Caisse Casio</h4>
+   <div class="rinfo"><div id="csEtat" style="white-space:pre-line${(i.etat&&i.etat.ok===false)?";color:var(--red)":""}">${esc(csEtatTxt())}</div>
+    <div class="csf"><label>Adresse <input id="csH" data-csf="hote" value="${v("hote",i.hote||"192.168.1.110")}" autocomplete="off" spellcheck="false"></label>
+    <label>Identifiant <input id="csU" data-csf="user" value="${v("user",i.user||"")}" autocomplete="off" spellcheck="false"></label>
+    <label>Mot de passe <input id="csP" data-csf="pass" type="password" value="${v("pass","")}" placeholder="${i.aMdp?"enregistré (laisser vide)":""}" autocomplete="new-password"></label></div>
+    <div class="row" style="margin-top:8px"><button class="btn small primary" data-gs="csTest" ${CS.busy?"disabled":""}>Enregistrer et tester</button>
+     ${i.regle?`<button class="btn small" data-gs="csCopie" ${CS.busy||(CS.prog&&CS.prog.etape==="copie")?"disabled":""}>Copier maintenant</button>`:""}</div>
+    ${CS.msg?`<div style="margin-top:6px;white-space:pre-line">${esc(CS.msg)}</div>`:""}
+    <div style="margin-top:6px;font-size:12px;opacity:.75">Lecture seule : GESTAT ne modifie jamais rien sur la caisse. Le mot de passe reste chiffré sur ce PC. Copie automatique toutes les 3 heures.</div></div>`}
+function csFin(){CAISSE_ICI=null;VT_LIST=null;VT.cache={};VT.load=null;caisseIci().then(()=>{render();setTimeout(()=>vtUpload(),1500)})}
+async function csTest(){const f=CS.f;CS.busy=true;CS.msg="Test en cours…";renderModal();
+  try{await window.api.casioRegler({hote:f.hote!=null?f.hote:(CS.info&&CS.info.hote)||"192.168.1.110",user:f.user!=null?f.user:(CS.info&&CS.info.user)||"",pass:f.pass||""});
+    CS.f={};const r=await window.api.casioTester();
+    CS.msg=r.ok?"✓ Caisse jointe : "+r.jours+" dossiers de journées et "+r.jrl+" journaux de tickets. La copie commence.":"✗ "+(r.erreur||"échec");
+    await csRefresh();renderModal();if(r.ok)csCopie()}
+  catch(e){CS.msg="✗ "+(e.message||e)}finally{CS.busy=false;renderModal()}}
+async function csCopie(){if(!csOk())return;CS.msg="";CS.prog={etape:"connexion",n:0,tot:0};renderModal();
+  try{const e=await window.api.casioCopier();CS.prog=null;await csRefresh();
+    CS.msg=e.ok?(e.nouveaux?"✓ "+e.nouveaux+" journées copiées. Elles partent maintenant dans la base en ligne.":"✓ Tout est déjà à jour."):"✗ "+(e.erreur||"échec");
+    if(e.ok&&e.nouveaux)csFin()}
+  catch(e){CS.prog=null;CS.msg="✗ "+(e.message||e)}renderModal()}
+if(csOk()){window.api.onCasioProg&&window.api.onCasioProg(p=>{CS.prog=p;
+  if(p.etape==="fini"||p.etape==="erreur"){CS.prog=null;csRefresh().then(()=>{if(S.modal)renderModal()});if(p.etape==="fini"&&p.nouveaux)csFin();return}
+  const el=document.getElementById("csEtat");if(el)el.textContent=csEtatTxt()});
+  csRefresh()}
+document.addEventListener("input",e=>{const t=e.target.closest("[data-csf]");if(t)CS.f[t.dataset.csf]=t.value});
 function renderModal(){const root=$("#modalRoot");if(!S.modal){root.innerHTML="";return}const dark=isDark(),C=caCfg(),c=SYNC.cfg();
   root.innerHTML=`<div class="overlay" data-gs="close"></div><div class="reglages" role="dialog" aria-label="Réglages">
    <div class="head"><h3>Réglages</h3><span class="syi ${c?"ok":"ko"}" title="${c?"Base en ligne réglée":"Base en ligne non réglée (config.js)"}">☁</span><button class="x" data-gs="close" aria-label="Fermer">✕</button></div>
    <h4>Caisse</h4>
-   <div class="rinfo">${PC?(CAISSE_ICI?`Journées de caisse trouvées dans <b>${esc(S.caDir||"")}</b>.<br>Magasin de cette caisse : <b>${C.mag?esc(storeNom(C.mag)):"pas encore choisi"}</b>
+   <div class="rinfo">${PC?(CAISSE_ICI?`Journées de caisse trouvées${S.caCasio?" (Videor et caisse Casio)":""} dans <b>${esc(S.caDir||"")}</b>.<br>Magasin de cette caisse : <b>${C.mag?esc(storeNom(C.mag)):"pas encore choisi"}</b>
      <div class="row" style="margin-top:8px">${MAGS.map(m=>`<button class="btn small${C.mag===m.id?" primary":""}" data-gs="caisse" data-v="${m.id}">${m.nom}</button>`).join(" ")} <button class="btn small" data-gs="dossier">Changer de dossier</button></div>
      ${VT.up.msg?`<div style="margin-top:6px">${esc(VT.up.msg)}</div>`:""}`:`Pas de journées de caisse Videor sur ce PC : GESTAT lit celles envoyées en ligne par le PC de la caisse.${window.api.caChoisir?` <button class="btn small" data-gs="dossier">Choisir un dossier</button>`:""}`)
      :"Les journées de caisse sont lues dans la base en ligne."}</div>
+   ${PC&&window.api.casioInfos?csSection():""}
    <h4>Données</h4>
    <button class="rbtn" data-gs="export"><span class="ic">💾</span>Exporter</button>
    ${PC?`<button class="rbtn" data-gs="folder"><span class="ic">📁</span>Dossier des données</button>`:""}
@@ -800,7 +842,7 @@ function storeMenu(show){const m=$("#storeMenu");if(!show){m.hidden=true;return}
 document.addEventListener("click",async e=>{
   const tb=e.target.closest("nav.tabs button[data-tab]");if(tb){S.tab=tb.dataset.tab;S.vt.lim=200;try{localStorage.setItem("gestat.tab",S.tab)}catch(_){}render();window.scrollTo(0,0);return}
   if(e.target.closest("#houseBtn")){storeMenu($("#storeMenu").hidden);return}
-  if(e.target.closest("#gearBtn")){S.modal=true;if(!S.majMsg)majCheck(false).then(renderModal);renderModal();return}
+  if(e.target.closest("#gearBtn")){S.modal=true;if(!S.majMsg)majCheck(false).then(renderModal);if(csOk())csRefresh().then(()=>{if(S.modal)renderModal()});renderModal();return}
   const b=e.target.closest("[data-gs]");if(!b){if(!e.target.closest("#storeMenu"))storeMenu(false);return}
   const k=b.dataset.gs,v=b.dataset.v;
   if(k==="store"){S.store=v;try{localStorage.setItem("gestat.store",v)}catch(_){}storeMenu(false);VT.load=null;render()}
@@ -809,6 +851,8 @@ document.addEventListener("click",async e=>{
   else if(k==="dossier"){if(window.api&&window.api.caChoisir){const d=await window.api.caChoisir();if(d){CAISSE_ICI=null;VT_LIST=null;await caisseIci();VT.cache={};VT.load=null;render()}}}
   else if(k==="export"){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([exportJson()],{type:"application/json"}));a.download="GESTAT-"+todayISO()+".json";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);toast("Réglages exportés")}
   else if(k==="folder"){window.api.openFolder&&window.api.openFolder()}
+  else if(k==="csTest"){csTest()}
+  else if(k==="csCopie"){csCopie()}
   else if(k==="maj"){if(PC)majApply();else{S.majMsg="La version en ligne se met à jour toute seule.";renderModal()}}
   else if(k==="theme"){try{localStorage.setItem("gestat.theme",v)}catch(_){}applyTheme();render()}});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.modal){S.modal=false;renderModal()}});
