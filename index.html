@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>GESTAT</title>
 <script>/* version web : réglages Supabase dans config.js (à côté de index.html). Programme PC : fournis par le programme. */if(!window.api)document.write('<script src="config.js"><\/script>')</script>
-<meta name="gs-version" content="1">
+<meta name="gs-version" content="2">
 <style>
 /* Layout (repris de GESTIME) : bandeau blanc [icône + titre + magasin ⌂] [logo] [⚙], rangée de 4 grands onglets verts, sélecteur de période, puis cartes coiffées d'un bandeau rouge. */
 :root{
@@ -414,6 +414,10 @@ svg.vtch{width:100%;height:auto;display:block}
 /* GESTAT */
 .gsask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#fff4dc;border:1px solid #f2b440;color:#5a3a00;border-radius:10px;padding:10px 14px;margin:0 0 14px}
 #gearBtn{position:relative}#gearPas{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#d3262b;color:#fff;font:700 11px/18px var(--body);animation:updBlink 1s ease-in-out infinite}
+#lg{position:fixed;inset:0;background:var(--bg);z-index:99;display:flex;align-items:center;justify-content:center;padding:20px}
+.lgb{display:flex;flex-direction:column;gap:10px;width:min(340px,100%);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
+.lgb h2{margin:0;font-size:20px}.lgb p{margin:0 0 4px;font-size:13px;color:var(--muted)}
+#lg input{padding:10px;border:1px solid var(--line);border-radius:8px;font-size:15px;background:var(--bg);color:inherit}#lgm{font-size:13px;color:var(--bad,#d3262b);min-height:16px}
 </style>
 </head>
 <body>
@@ -451,7 +455,7 @@ svg.vtch{width:100%;height:auto;display:block}
 <script>
 (function(){
 "use strict";
-const APP="GESTAT",APP_VERSION=1;
+const APP="GESTAT",APP_VERSION=2;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
@@ -466,6 +470,37 @@ const MAGS=[{id:"bredis",nom:"BREDIS"},{id:"clamart",nom:"CLAMART"}];
 const S={store:(()=>{try{const v=localStorage.getItem("gestat.store");return MAGS.some(m=>m.id===v)?v:"bredis"}catch(e){return "bredis"}})(),
   tab:(()=>{try{return localStorage.getItem("gestat.tab")||"synth"}catch(e){return "synth"}})(),modal:false,majMsg:"",majBusy:false,majNew:false};
 const storeNom=id=>(MAGS.find(m=>m.id===(id||S.store))||{}).nom||"—";
+/* v2 : connexion G20 (même compte que GESTIME / GESMAR), une seule fois par appareil ; « Plus tard » tant que la base reste ouverte */
+const GA=(()=>{const SK="horaires-auth",ID_DOM="@hotmail.com";let tok=null,exp=0,pr=null;
+  const idMail=v=>{v=String(v||"").trim().toLowerCase();return !v?"":v.includes("@")?v:v+ID_DOM};
+  const has=()=>{try{return !!localStorage.getItem(SK)}catch(e){return false}};
+  function shared(){try{const o=JSON.parse(localStorage.getItem(SK+"-at")||"null");if(o&&o.t&&o.e>Date.now()+60000){tok=o.t;exp=o.e;return true}}catch(e){}return false}
+  async function grant(c,body,g){let r;try{r=await fetch(c.url+"/auth/v1/token?grant_type="+g,{method:"POST",headers:{apikey:c.key,"Content-Type":"application/json"},body:JSON.stringify(body)})}catch(e){throw new Error("OFFLINE")}
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok){const t=String(j.error_description||j.msg||j.message||""),x=new Error(/invalid login|invalid_credentials|invalid_grant/i.test(t+" "+(j.error_code||j.code||j.error||""))&&g==="password"?"identifiant ou mot de passe incorrect":(t||"refusé"));x.st=r.status||400;throw x}
+    tok=j.access_token;exp=Date.now()+(j.expires_in||3600)*1000;
+    try{localStorage.setItem(SK,j.refresh_token);localStorage.setItem(SK+"-at",JSON.stringify({t:tok,e:exp}));if(j.user&&j.user.email)localStorage.setItem(SK+"-mail",j.user.email)}catch(e){}}
+  async function token(c){if(tok&&exp>Date.now()+60000)return tok;if(shared())return tok;
+    let rt=null;try{rt=localStorage.getItem(SK)}catch(e){}if(!rt){const x=new Error("AUTH");x.st=401;throw x}
+    if(!pr)pr=grant(c,{refresh_token:rt},"refresh_token").catch(e=>{if(e.message!=="OFFLINE"&&e.st>=400&&e.st<500)lost();throw e}).finally(()=>{pr=null});
+    await pr;return tok}
+  function drop(){tok=null;exp=0;try{localStorage.removeItem(SK+"-at")}catch(e){}}
+  function lost(){tok=null;exp=0;try{localStorage.removeItem(SK);localStorage.removeItem(SK+"-at")}catch(e){}}
+  const login=(c,id,pw)=>grant(c,{email:idMail(id),password:pw},"password");
+  const who=()=>{let m="";try{m=localStorage.getItem(SK+"-mail")||""}catch(e){}return m.toLowerCase().endsWith(ID_DOM)?m.slice(0,-ID_DOM.length).toUpperCase():m};
+  return{has,token,lost,drop,login,who}})();
+function gsLogin(msg){if(S.lgLater&&!msg)return;let o=document.getElementById("lg");if(!o){o=document.createElement("div");o.id="lg";document.body.appendChild(o)}
+  o.innerHTML=`<div class="lgb"><h2>🔒 Connexion à GESTAT</h2><p>Une seule fois sur cet appareil : ensuite GESTAT reste connecté. Même identifiant que GESTIME et GESMAR (G20).</p><input id="lge" type="text" placeholder="Identifiant" autocomplete="username" autocapitalize="off" spellcheck="false"><input id="lgp" type="password" placeholder="Mot de passe" autocomplete="current-password"><button class="btn primary" id="lgo" style="padding:11px;font-size:15px">Se connecter</button><button class="btn" id="lgl" style="padding:9px;font-size:14px">Plus tard</button><div id="lgm">${esc(msg||"")}</div></div>`}
+async function gsDoLogin(){const m=document.getElementById("lgm"),c=SYNC.cfg();if(!c){m.textContent="Base en ligne non réglée (config.js).";return}
+  const id=document.getElementById("lge").value,pw=document.getElementById("lgp").value;if(!id.trim()||!pw){m.textContent="Tapez l’identifiant et le mot de passe.";return}
+  m.textContent="Connexion…";document.getElementById("lgo").disabled=true;
+  try{await GA.login(c,id,pw);document.getElementById("lg").remove();VT.cache={};VT.load=null;render();if(S.modal)renderModal()}
+  catch(e){const b=document.getElementById("lgo");if(b)b.disabled=false;m.textContent=e.message==="OFFLINE"?"Pas de connexion internet : réessayez.":"Connexion refusée : "+e.message+"."}}
+document.addEventListener("click",e=>{if(e.target.id==="lgo"){gsDoLogin();return}if(e.target.id==="lgl"){S.lgLater=true;const o=document.getElementById("lg");if(o)o.remove();return}
+  if(e.target.closest('[data-gs="login"]')){S.modal=false;renderModal();gsLogin("");return}
+  if(e.target.closest('[data-gs="logout"]')){if(!S.gsOut){S.gsOut=1;renderModal();setTimeout(()=>{S.gsOut=0;if(S.modal)renderModal()},4000);return}
+    try{["horaires-auth","horaires-auth-at","horaires-auth-mail"].forEach(k=>localStorage.removeItem(k))}catch(_){}location.reload()}});
+document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="lgp")gsDoLogin()});
 // Base en ligne (adresse et clé dans config.js, jamais dans le dépôt)
 const SYNC={cfg(){const c=window.SYNC&&window.SYNC.url&&window.SYNC.key&&!/VOTRE/.test(window.SYNC.url)?{url:String(window.SYNC.url).trim().replace(/\/+$/,""),key:String(window.SYNC.key).trim()}:null;return c}};
 // Caisse de ce PC : le magasin dont les fichiers Videor sont sur ce PC (choisi une fois dans les réglages)
@@ -523,8 +558,11 @@ const vtLocal=()=>VT_API()&&typeof caCfg==="function"&&S.store===caCfg().mag;
 let VT_LIST=null;
 async function vtListLocal(force){if(!VT_LIST||force||Date.now()-VT_LIST.t>60000){const L=await window.api.caLister();VT_LIST={t:Date.now(),L}}return VT_LIST.L}
 function vtCfgSb(){try{return SYNC.cfg()}catch(e){return null}}
-async function vtSb(path,opt){const c=vtCfgSb();if(!c)throw new Error("Base en ligne non réglée");
-  const r=await fetch(c.url+"/rest/v1/"+path,Object.assign({},opt,{headers:Object.assign({apikey:c.key,"Content-Type":"application/json"},(c.key.split(".").length===3?{Authorization:"Bearer "+c.key}:{}),opt&&opt.headers)}));
+async function vtSb(path,opt,again){const c=vtCfgSb();if(!c)throw new Error("Base en ligne non réglée");
+  const au=GA.has()?{Authorization:"Bearer "+await GA.token(c)}:(c.key.split(".").length===3?{Authorization:"Bearer "+c.key}:{}); // v2 : compte G20 si connecté
+  const r=await fetch(c.url+"/rest/v1/"+path,Object.assign({},opt,{headers:Object.assign({apikey:c.key,"Content-Type":"application/json"},au,opt&&opt.headers)}));
+  if(r.status===401&&GA.has()&&!again){GA.drop();return vtSb(path,opt,true)}
+  if((r.status===401||r.status===403)&&!GA.has()){gsLogin("La base est protégée : connectez cet appareil (identifiant G20).");throw new Error("Pas connecté : identifiant G20 nécessaire")}
   if(!r.ok){let t="";try{t=(await r.json()).message||""}catch(e){}throw new Error(r.status===404||/does not exist|schema cache/.test(t)?"Table « gesmar_ventes » absente : lancez le script pc/supabase-gesmar-ventes.sql dans Supabase":"Erreur "+r.status+(t?" : "+t:""))}
   return r.status===204||r.status===201?null:r.json()}
 async function vtGet(a,b){const mag=S.store,want=vtDays(a,b).filter(d=>!(mag+"|"+d in VT.cache));
@@ -753,6 +791,7 @@ function renderModal(){const root=$("#modalRoot");if(!S.modal){root.innerHTML=""
    <h4>Logiciel</h4>
    <button class="rbtn" data-gs="maj" ${S.majBusy?"disabled":""}><span class="ic">🔄</span>Mettre à jour le logiciel${S.majNew?'<span class="pas">1</span>':""}</button>
    <div class="rmaj">${esc(S.majMsg||("Version installée : "+APP_VERSION))}</div>
+   ${SYNC.cfg()?(GA.has()?`<h4>Compte</h4><div class="rmaj">Connecté : ${esc(GA.who()||"oui")}</div><button class="rbtn" data-gs="logout"><span class="ic">🚪</span>${S.gsOut?"Confirmer la déconnexion ?":"Se déconnecter"}</button>`:`<h4>Compte</h4><div class="rmaj">Cet appareil n'est pas connecté.</div><button class="rbtn" data-gs="login"><span class="ic">🔒</span>Se connecter (G20)</button>`):""}
    <h4>Affichage</h4>
    <div class="rtheme"><button data-gs="theme" data-v="clair" aria-pressed="${!dark}">☀️ Clair</button><button data-gs="theme" data-v="sombre" aria-pressed="${dark}">🌙 Sombre</button></div></div>`}
 function storeMenu(show){const m=$("#storeMenu");if(!show){m.hidden=true;return}
@@ -775,6 +814,7 @@ document.addEventListener("click",async e=>{
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.modal){S.modal=false;renderModal()}});
 // ---- démarrage ----
 render();caisseIci();
+if(SYNC.cfg()&&!GA.has())setTimeout(()=>gsLogin(""),1500); // v2 : proposé une fois au démarrage
 if(PC&&window.api.updateCheck){let last=0;const auto=()=>{if(Date.now()-last<60000||S.majBusy)return;last=Date.now();const was=S.majNew;majCheck(true).then(()=>{if(S.majNew!==was)render()})};
   setTimeout(auto,4000);setInterval(()=>{last=0;auto()},600000);window.addEventListener("focus",auto);
   const H=21;let fait=new Date().getHours()>=H?new Date().toDateString():"";
