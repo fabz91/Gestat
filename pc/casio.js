@@ -78,15 +78,15 @@ function createCasio({ dataDir, safeStorage, log }) {
         const a8 = auj8(), recent = moins(a8, 3), recentJrl = moins(a8, 2);
         // 1) journées (un dossier JJMMAAAA par jour)
         const dossiers = racine.filter(x => iso8(x)).map(x => ({ nom: x, d: iso8(x) })).filter(x => x.d <= a8).sort((u, v) => (u.d < v.d ? 1 : -1));
-        const vides = new Set(etat.vides || []), faits = new Set(etat.faits || []);
-        const aFaire = dossiers.filter(x => x.d >= recent || (!vides.has(x.d) && !faits.has(x.nom)));
+        const vides = new Set(), faits = new Set(etat.faits || []); // 1.1.1 : un dossier sans journée est simplement réessayé la fois suivante
+        const aFaire = dossiers.filter(x => x.d >= recent || !faits.has(x.nom));
         // 2) journaux des tickets
         const jrls = racine.filter(x => /^[A-Za-z0-9_\-]+_\d{8}\.jrl$/i.test(x));
         const jrlFaire = jrls.filter(x => { const m = /_(\d{8})\.jrl$/i.exec(x); return (m && m[1] >= recentJrl) || !fs.existsSync(path.join(dir, 'jrl', x)); });
         prog.etape = 'copie'; prog.tot = aFaire.length + jrlFaire.length + 1; tick();
         for (const x of aFaire) {
           const v = await lireUn(f, [x.nom + '/vent.tot', x.nom + '/VENT.TOT']);
-          if (!v || v.length < 20) { if (x.d < recent) vides.add(x.d); }
+          if (!v || v.length < 20) { vides.add(x.d); }
           else {
             const d = dateContenu(v) || x.d;
             const neuf = ecrireFichier(path.join(dir, 'jours', d, 'vent.tot'), v);

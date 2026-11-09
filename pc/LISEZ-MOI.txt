@@ -28,7 +28,7 @@ CE QUE CONTIENT CE DOSSIER
      Il lance « npm install » puis « npm run build ». Comptez quelques minutes,
      avec une connexion internet.
   4. L'installateur apparaît dans le dossier « dist » :
-     GESTAT-Installateur-1.1.0.exe. Lancez-le pour installer GESTAT.
+     GESTAT-Installateur-1.1.1.exe. Lancez-le pour installer GESTAT.
      Windows peut afficher « Windows a protégé votre ordinateur » (installateur
      non signé) : cliquez sur « Informations complémentaires » puis
      « Exécuter quand même ».

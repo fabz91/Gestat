@@ -91,13 +91,14 @@ class FtpLecture {
   async noms(dir) {
     let b;
     try { b = await this._data(dir ? 'NLST ' + dir : 'NLST'); }
-    catch (e) { if (e.ftp === 550 || e.ftp === 450) return []; throw e; }
+    catch (e) { if (e.ftp === 450 || e.ftp >= 500) return []; throw e; }
     return b.toString('latin1').split(/\r?\n/).map(s => s.trim()).filter(Boolean).map(s => s.split('/').pop()).filter(s => s !== '.' && s !== '..');
   }
   // Contenu d'un fichier (Buffer), ou null s'il n'existe pas.
   async lire(chemin) {
     try { return await this._data('RETR ' + chemin); }
-    catch (e) { if (e.ftp === 550 || e.ftp === 450) return null; throw e; }
+    // 1.1.1 : la caisse Casio répond « 501 Cannot open file » quand le fichier n'existe pas (pas 550).
+    catch (e) { if (e.ftp === 450 || e.ftp >= 500) return null; throw e; }
   }
   async taille(chemin) {
     try { const r = await this.cmd('SIZE ' + chemin); return r.code === 213 ? +String(r.text).trim() : -1; } catch (e) { return -1; }
