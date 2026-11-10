@@ -6,12 +6,14 @@
 //   0205-CC_AAAAMMJJ.JRL   journal de tous les tickets d'une caisse (annulations, caissiers…)
 //   TARIF.TXT              fichier des articles (prix de vente)
 //   jrl.7z                 (CLAMART, 1.2.0) les journaux .JRL de la veille, compressés chaque nuit par la caisse : extraits sur ce PC
+//   ventes/AAMMJJAZ.050    (CLAMART, 1.2.0) historique : le Z de chaque jour depuis 2020 (sans articles), copié dans ventes\ sur ce PC
 // Sur ce PC (%APPDATA%\GESTAT\donnees\casio) :
 //   jours\AAAAMMJJ\vent.tot, jours\AAAAMMJJ\save001.ttt, jrl\*.JRL, TARIF.TXT, etat.json
 const fs = require('fs');
 const path = require('path');
 const { FtpLecture } = require('./ftp');
 const { lire7z } = require('./sevenzip');
+const { azVersTot, dateAz } = require('./az050');
 
 function createCasio({ dataDir, safeStorage, log }) {
   const cfgPath = path.join(dataDir, 'gestat-casio.json');
@@ -87,7 +89,13 @@ function createCasio({ dataDir, safeStorage, log }) {
         const jrlFaire = jrls.filter(x => { const m = /_(\d{8})\.jrl$/i.exec(x); return (m && m[1] >= recentJrl) || !fs.existsSync(path.join(dir, 'jrl', x)); });
         // 1.2.0 : CLAMART — la caisse compresse chaque nuit les journaux de la veille dans jrl.7z (à la racine)
         const archives = racine.filter(x => /^jrl\.7z$/i.test(x));
-        prog.etape = 'copie'; prog.tot = aFaire.length + jrlFaire.length + archives.length + 1; tick();
+        // 1.2.0 : historique (dossier « ventes » : un Z par jour, AAMMJJAZ.050) — seulement ceux pas encore copiés
+        let azFaire = [];
+        if (racine.some(x => /^ventes$/i.test(x))) {
+          const nv = await f.noms('ventes');
+          azFaire = nv.filter(x => dateAz(x) && dateAz(x) <= a8 && (dateAz(x) >= recent || !fs.existsSync(path.join(dir, 'ventes', x.toUpperCase()))));
+        }
+        prog.etape = 'copie'; prog.tot = aFaire.length + jrlFaire.length + archives.length + azFaire.length + 1; tick();
         for (const x of aFaire) {
           const v = await lireUn(f, [x.nom + '/vent.tot', x.nom + '/VENT.TOT']);
           if (!v || v.length < 20) { vides.add(x.d); }
@@ -112,6 +120,10 @@ function createCasio({ dataDir, safeStorage, log }) {
           } catch (e) { L('casio jrl.7z', e); prog.archiveErreur = 'jrl.7z illisible : ' + (e.message || e); }
           prog.n++; tick();
         }
+        for (const x of azFaire) {
+          const b = await f.lire('ventes/' + x); if (b && b.length >= 19 && b.length % 19 === 0) { if (ecrireFichier(path.join(dir, 'ventes', x.toUpperCase()), b)) prog.nouveaux++; }
+          prog.n++; if (prog.n % 10 === 0) tick();
+        }
         const t = await lireUn(f, ['TARIF.TXT', 'tarif.txt']); if (t && t.length > 100) ecrireFichier(path.join(dir, 'TARIF.TXT'), t);
         prog.n++; prog.etape = 'fini'; tick();
         const e2 = { derniere: new Date().toISOString(), debut, ok: true, erreur: prog.archiveErreur || '', jours: listeJours().length, jrl: listeJrl().length, nouveaux: prog.nouveaux, vides: [...vides], faits: [...faits] };
@@ -127,10 +139,25 @@ function createCasio({ dataDir, safeStorage, log }) {
   }
 
   function listeJours() { try { return fs.readdirSync(path.join(dir, 'jours')).filter(d => /^\d{8}$/.test(d) && fs.existsSync(path.join(dir, 'jours', d, 'vent.tot'))).sort(); } catch (e) { return []; } }
+  function listeAz() { try { return fs.readdirSync(path.join(dir, 'ventes')).filter(x => dateAz(x)).sort(); } catch (e) { return []; } }
   function listeJrl() { try { return fs.readdirSync(path.join(dir, 'jrl')).filter(x => /\.jrl$/i.test(x)).sort(); } catch (e) { return []; } }
   // Fichiers « VENT.TOT.AAAAMMJJ » vus comme ceux de Videor (même contenu) : taille + date de modification.
   function ventes() {
-    return listeJours().map(d => { const f = path.join(dir, 'jours', d, 'vent.tot'); const st = fs.statSync(f); return { nom: 'VENT.TOT.' + d, size: st.size, mtime: Math.round(st.mtimeMs), casio: true }; });
+    const jours = listeJours(), vus = new Set(jours);
+    const out = jours.map(d => { const f = path.join(dir, 'jours', d, 'vent.tot'); const st = fs.statSync(f); return { nom: 'VENT.TOT.' + d, size: st.size, mtime: Math.round(st.mtimeMs), casio: true }; });
+    // 1.2.0 : jours de l'historique (dossier « ventes » de la caisse) qui n'ont pas de journée complète
+    for (const x of listeAz()) { const d = dateAz(x); if (vus.has(d)) continue; vus.add(d); const st = fs.statSync(path.join(dir, 'ventes', x)); out.push({ nom: 'VENT.TOT.' + d, size: st.size, mtime: Math.round(st.mtimeMs), casio: true, historique: true }); }
+    return out;
+  }
+  // Texte VENT.TOT d'un jour : la journée complète copiée de la caisse, sinon reconstituée depuis l'historique (sans articles).
+  // ref() renvoie le texte d'une journée VENT.TOT récente (noms des rayons, familles, paiements, heures).
+  function lireJour(d8, ref) {
+    const f = path.join(dir, 'jours', d8, 'vent.tot');
+    if (fs.existsSync(f)) return fs.readFileSync(f, 'latin1');
+    const az = listeAz().find(x => dateAz(x) === d8); if (!az) throw new Error('Journée introuvable : ' + d8);
+    let r = ''; try { r = ref ? ref() : ''; } catch (e) {}
+    if (!r) { const j = listeJours(); if (j.length) r = fs.readFileSync(path.join(dir, 'jours', j[j.length - 1], 'vent.tot'), 'latin1'); }
+    return azVersTot(fs.readFileSync(path.join(dir, 'ventes', az)), r, d8);
   }
   function chemin(rel) {
     const r = String(rel || '').replace(/\\/g, '/');
@@ -142,7 +169,7 @@ function createCasio({ dataDir, safeStorage, log }) {
     if (quoi === 'caisses') return listeJours().filter(d => fs.existsSync(path.join(dir, 'jours', d, 'save001.ttt'))).map(d => ({ nom: 'jours/' + d + '/save001.ttt', d }));
     return ventes();
   }
-  return { infos, regler, tester, copier, ventes, lister, chemin, lireEtat };
+  return { infos, regler, tester, copier, ventes, lister, chemin, lireEtat, lireJour };
 }
 
 module.exports = { createCasio };

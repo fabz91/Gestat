@@ -146,7 +146,8 @@ ipcMain.handle('gm:caLire', async (e, nom) => {
 ipcMain.handle('gm:venteLire', async (e, nom) => {
   if (!CA_NOM.test(String(nom))) throw new Error('Nom refusé');
   try { return await fs.promises.readFile(path.join(caDir(), String(nom)), 'latin1'); }
-  catch (err) { const d = String(nom).slice(-8); return fs.promises.readFile(casio.chemin('jours/' + d + '/vent.tot'), 'latin1'); }
+  catch (err) { const d = String(nom).slice(-8); return casio.lireJour(d, derniereVideor); } // 1.2.0 : journée de la caisse, ou historique reconstitué
+
 });
 ipcMain.handle('gm:caChoisir', async () => {
   const c = facCfg();
@@ -155,6 +156,10 @@ ipcMain.handle('gm:caChoisir', async () => {
   c.caisse = r.filePaths[0]; fs.writeFileSync(facCfgPath, JSON.stringify(c, null, 1), 'utf8'); return c.caisse;
 });
 
+// 1.2.0 : la journée Videor la plus récente (noms des rayons, familles… pour l'historique reconstitué)
+function derniereVideor() {
+  try { const n = fs.readdirSync(caDir()).filter(f => CA_NOM.test(f)).sort(); return n.length ? fs.readFileSync(path.join(caDir(), n[n.length - 1]), 'latin1') : ''; } catch (e) { return ''; }
+}
 // ===== 1.1.0 : caisse Casio (ftp, LECTURE SEULE) =====
 // Copie sur ce PC les journées (environ 2 ans), les journaux des tickets et le fichier des articles.
 // Réglages : adresse, identifiant, mot de passe (chiffré par Windows, ne quitte jamais ce PC).
