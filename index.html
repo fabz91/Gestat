@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>GESTAT</title>
 <script>/* version web : réglages Supabase dans config.js (à côté de index.html). Programme PC : fournis par le programme. */if(!window.api)document.write('<script src="config.js"><\/script>')</script>
-<meta name="gs-version" content="5">
+<meta name="gs-version" content="6">
 <style>
 /* Layout (repris de GESTIME) : bandeau blanc [icône + titre + magasin ⌂] [logo] [⚙], rangée de 4 grands onglets verts, sélecteur de période, puis cartes coiffées d'un bandeau rouge. */
 :root{
@@ -465,7 +465,7 @@ nav.tabs button[data-tab="controle"][aria-selected="true"]{background:var(--red)
 <script>
 (function(){
 "use strict";
-const APP="GESTAT",APP_VERSION=5;
+const APP="GESTAT",APP_VERSION=6;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
@@ -937,8 +937,7 @@ function csEtatTxt(){const i=CS.info||{},e=i.etat||{},p=CS.prog||i.progression;
   if(e.ok===false&&e.erreur)t+="\n⚠ Dernier essai le "+csDate(e.derniereTentative)+" : "+e.erreur;return t}
 function csSection(){const i=CS.info||{},f=CS.f;
   const v=(k,d)=>esc(f[k]!=null?f[k]:d);
-  return `<h4>Caisse Casio</h4>
-   <div class="rinfo"><div id="csEtat" style="white-space:pre-line${(i.etat&&i.etat.ok===false)?";color:var(--red)":""}">${esc(csEtatTxt())}</div>
+  return `<div class="rinfo"><div id="csEtat" style="white-space:pre-line${(i.etat&&i.etat.ok===false)?";color:var(--red)":""}">${esc(csEtatTxt())}</div>
     <div class="csf"><label>Adresse <input id="csH" data-csf="hote" value="${v("hote",i.hote||"192.168.1.110")}" autocomplete="off" spellcheck="false"></label>
     <label>Identifiant <input id="csU" data-csf="user" value="${v("user",i.user||"")}" autocomplete="off" spellcheck="false"></label>
     <label>Mot de passe <input id="csP" data-csf="pass" type="password" value="${v("pass","")}" placeholder="${i.aMdp?"enregistré (laisser vide)":""}" autocomplete="new-password"></label></div>
@@ -963,15 +962,23 @@ if(csOk()){window.api.onCasioProg&&window.api.onCasioProg(p=>{CS.prog=p;
   const el=document.getElementById("csEtat");if(el)el.textContent=csEtatTxt()});
   csRefresh()}
 document.addEventListener("input",e=>{const t=e.target.closest("[data-csf]");if(t)CS.f[t.dataset.csf]=t.value});
+function caVideorHtml(C){return `<div class="rinfo">${PC?(CAISSE_ICI?`Journées de caisse trouvées${S.caCasio?" (Videor et caisse Casio)":""} dans <b>${esc(S.caDir||"")}</b>.<br>Magasin de cette caisse : <b>${C.mag?esc(storeNom(C.mag)):"pas encore choisi"}</b>
+     <div class="row" style="margin-top:8px">${MAGS.map(m=>`<button class="btn small${C.mag===m.id?" primary":""}" data-gs="caisse" data-v="${m.id}">${m.nom}</button>`).join(" ")} <button class="btn small" data-gs="dossier">Changer de dossier</button></div>
+     ${VT.up.msg?`<div style="margin-top:6px">${esc(VT.up.msg)}</div>`:""}`:`Pas de journées de caisse Videor sur ce PC : GESTAT lit celles envoyées en ligne par le PC de la caisse.${window.api.caChoisir?` <button class="btn small" data-gs="dossier">Choisir un dossier</button>`:""}`)
+     :"Les journées de caisse sont lues dans la base en ligne."}</div>`}
 function renderModal(){const root=$("#modalRoot");if(!S.modal){root.innerHTML="";return}const dark=isDark(),C=caCfg(),c=SYNC.cfg();
+  // v6 : petites fenêtres « Journées de caisse Videor » et « Connexion à la caisse Casio » (demande du gérant), ouvertes depuis Réglages → Caisse
+  if(S.modal==="videor"||S.modal==="casio"){const t=S.modal==="videor"?"Journées de caisse Videor":"Connexion à la caisse Casio";
+    root.innerHTML=`<div class="overlay" data-gs="close"></div><div class="reglages" role="dialog" aria-label="${t}">
+     <div class="head"><h3>${t}</h3><button class="x" data-gs="back" aria-label="Retour aux réglages" title="Retour aux réglages">✕</button></div>
+     ${S.modal==="videor"?caVideorHtml(C):csSection()}</div>`;return}
   root.innerHTML=`<div class="overlay" data-gs="close"></div><div class="reglages" role="dialog" aria-label="Réglages">
    <div class="head"><h3>Réglages</h3><span class="syi ${c?"ok":"ko"}" title="${c?"Base en ligne réglée":"Base en ligne non réglée (config.js)"}">☁</span><button class="x" data-gs="close" aria-label="Fermer">✕</button></div>
    <h4>Caisse</h4>
-   <div class="rinfo">${PC?(CAISSE_ICI?`Journées de caisse trouvées${S.caCasio?" (Videor et caisse Casio)":""} dans <b>${esc(S.caDir||"")}</b>.<br>Magasin de cette caisse : <b>${C.mag?esc(storeNom(C.mag)):"pas encore choisi"}</b>
-     <div class="row" style="margin-top:8px">${MAGS.map(m=>`<button class="btn small${C.mag===m.id?" primary":""}" data-gs="caisse" data-v="${m.id}">${m.nom}</button>`).join(" ")} <button class="btn small" data-gs="dossier">Changer de dossier</button></div>
-     ${VT.up.msg?`<div style="margin-top:6px">${esc(VT.up.msg)}</div>`:""}`:`Pas de journées de caisse Videor sur ce PC : GESTAT lit celles envoyées en ligne par le PC de la caisse.${window.api.caChoisir?` <button class="btn small" data-gs="dossier">Choisir un dossier</button>`:""}`)
-     :"Les journées de caisse sont lues dans la base en ligne."}</div>
-   ${PC&&window.api.casioInfos?csSection():""}
+   <button class="rbtn" data-gs="sub" data-v="videor"><span class="ic">🧾</span>Journées de caisse Videor${VT.up.msg&&/impossible/.test(VT.up.msg)?'<span class="pas">!</span>':""}</button>
+   <div class="rmaj">${esc(PC&&CAISSE_ICI?"Magasin de cette caisse : "+(C.mag?storeNom(C.mag):"pas encore choisi"):"Lues dans la base en ligne")}</div>
+   ${PC&&window.api.casioInfos?`<button class="rbtn" data-gs="sub" data-v="casio"><span class="ic">📡</span>Connexion à la caisse Casio</button>
+   <div class="rmaj">${esc((CS.info&&CS.info.regle)?"Adresse "+(CS.info.hote||"")+" · copie automatique toutes les 3 heures":"Pas encore réglée")}</div>`:""}
    <h4>Données</h4>
    <button class="rbtn" data-gs="export"><span class="ic">💾</span>Exporter</button>
    ${PC?`<button class="rbtn" data-gs="folder"><span class="ic">📁</span>Dossier des données</button>`:""}
@@ -992,6 +999,8 @@ document.addEventListener("click",async e=>{
   const k=b.dataset.gs,v=b.dataset.v;
   if(k==="store"){S.store=v;try{localStorage.setItem("gestat.store",v)}catch(_){}storeMenu(false);VT.load=null;CTL.load=null;render()}
   else if(k==="close"){S.modal=false;renderModal()}
+  else if(k==="sub"){S.modal=v;if(v==="casio"&&csOk())csRefresh().then(()=>{if(S.modal)renderModal()});renderModal()}
+  else if(k==="back"){S.modal=true;renderModal()}
   else if(k==="caisse"){caSet(v);toast("Caisse de ce PC : "+storeNom(v))}
   else if(k==="dossier"){if(window.api&&window.api.caChoisir){const d=await window.api.caChoisir();if(d){CAISSE_ICI=null;VT_LIST=null;await caisseIci();VT.cache={};VT.load=null;render()}}}
   else if(k==="export"){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([exportJson()],{type:"application/json"}));a.download="GESTAT-"+todayISO()+".json";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);toast("Réglages exportés")}
@@ -1000,7 +1009,7 @@ document.addEventListener("click",async e=>{
   else if(k==="csCopie"){csCopie()}
   else if(k==="maj"){if(PC)majApply();else{S.majMsg="La version en ligne se met à jour toute seule.";renderModal()}}
   else if(k==="theme"){try{localStorage.setItem("gestat.theme",v)}catch(_){}applyTheme();render()}});
-document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.modal){S.modal=false;renderModal()}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.modal){S.modal=S.modal===true?false:true;renderModal()}});
 // ---- démarrage ----
 render();caisseIci();
 if(SYNC.cfg()&&!GA.has())setTimeout(()=>gsLogin(""),1500); // v2 : proposé une fois au démarrage
