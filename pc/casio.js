@@ -5,11 +5,13 @@
 //   JJMMAAAA/save001.TTT   la même journée, avec un bloc de totaux PAR CAISSE
 //   0205-CC_AAAAMMJJ.JRL   journal de tous les tickets d'une caisse (annulations, caissiers…)
 //   TARIF.TXT              fichier des articles (prix de vente)
+//   jrl.7z                 (CLAMART, 1.2.0) les journaux .JRL de la veille, compressés chaque nuit par la caisse : extraits sur ce PC
 // Sur ce PC (%APPDATA%\GESTAT\donnees\casio) :
 //   jours\AAAAMMJJ\vent.tot, jours\AAAAMMJJ\save001.ttt, jrl\*.JRL, TARIF.TXT, etat.json
 const fs = require('fs');
 const path = require('path');
 const { FtpLecture } = require('./ftp');
+const { lire7z } = require('./sevenzip');
 
 function createCasio({ dataDir, safeStorage, log }) {
   const cfgPath = path.join(dataDir, 'gestat-casio.json');
@@ -52,7 +54,7 @@ function createCasio({ dataDir, safeStorage, log }) {
   }
   async function tester() {
     const f = await ouvrir();
-    try { const n = await f.noms(''); const jours = n.filter(x => /^\d{8}$/.test(x)).length, jrl = n.filter(x => /\.jrl$/i.test(x)).length; return { ok: true, n: n.length, jours, jrl }; }
+    try { const n = await f.noms(''); const jours = n.filter(x => /^\d{8}$/.test(x)).length, jrl = n.filter(x => /\.jrl$/i.test(x)).length, archive = n.some(x => /^jrl\.7z$/i.test(x)); return { ok: true, n: n.length, jours, jrl: jrl || (archive ? 1 : 0), archive }; }
     finally { f.fermer(); }
   }
 
@@ -83,7 +85,9 @@ function createCasio({ dataDir, safeStorage, log }) {
         // 2) journaux des tickets
         const jrls = racine.filter(x => /^[A-Za-z0-9_\-]+_\d{8}\.jrl$/i.test(x));
         const jrlFaire = jrls.filter(x => { const m = /_(\d{8})\.jrl$/i.exec(x); return (m && m[1] >= recentJrl) || !fs.existsSync(path.join(dir, 'jrl', x)); });
-        prog.etape = 'copie'; prog.tot = aFaire.length + jrlFaire.length + 1; tick();
+        // 1.2.0 : CLAMART — la caisse compresse chaque nuit les journaux de la veille dans jrl.7z (à la racine)
+        const archives = racine.filter(x => /^jrl\.7z$/i.test(x));
+        prog.etape = 'copie'; prog.tot = aFaire.length + jrlFaire.length + archives.length + 1; tick();
         for (const x of aFaire) {
           const v = await lireUn(f, [x.nom + '/vent.tot', x.nom + '/VENT.TOT']);
           if (!v || v.length < 20) { vides.add(x.d); }
@@ -101,9 +105,16 @@ function createCasio({ dataDir, safeStorage, log }) {
           const b = await f.lire(x); if (b) ecrireFichier(path.join(dir, 'jrl', x), b);
           prog.n++; if (prog.n % 5 === 0) tick();
         }
+        for (const x of archives) {
+          try {
+            const b = await f.lire(x);
+            if (b && b.length > 32) for (const e of lire7z(b)) { const nom = path.basename(String(e.name).replace(/\\/g, '/')); if (/^[A-Za-z0-9_\-]+_\d{8}\.jrl$/i.test(nom) && e.data.length) ecrireFichier(path.join(dir, 'jrl', nom), Buffer.from(e.data)); }
+          } catch (e) { L('casio jrl.7z', e); prog.archiveErreur = 'jrl.7z illisible : ' + (e.message || e); }
+          prog.n++; tick();
+        }
         const t = await lireUn(f, ['TARIF.TXT', 'tarif.txt']); if (t && t.length > 100) ecrireFichier(path.join(dir, 'TARIF.TXT'), t);
         prog.n++; prog.etape = 'fini'; tick();
-        const e2 = { derniere: new Date().toISOString(), debut, ok: true, erreur: '', jours: listeJours().length, jrl: listeJrl().length, nouveaux: prog.nouveaux, vides: [...vides], faits: [...faits] };
+        const e2 = { derniere: new Date().toISOString(), debut, ok: true, erreur: prog.archiveErreur || '', jours: listeJours().length, jrl: listeJrl().length, nouveaux: prog.nouveaux, vides: [...vides], faits: [...faits] };
         ecrireEtat(e2); return e2;
       } catch (e) {
         L('casio', e);

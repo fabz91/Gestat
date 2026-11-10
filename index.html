@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>GESTAT</title>
 <script>/* version web : réglages Supabase dans config.js (à côté de index.html). Programme PC : fournis par le programme. */if(!window.api)document.write('<script src="config.js"><\/script>')</script>
-<meta name="gs-version" content="6">
+<meta name="gs-version" content="7">
 <style>
 /* Layout (repris de GESTIME) : bandeau blanc [icône + titre + magasin ⌂] [logo] [⚙], rangée de 4 grands onglets verts, sélecteur de période, puis cartes coiffées d'un bandeau rouge. */
 :root{
@@ -465,7 +465,7 @@ nav.tabs button[data-tab="controle"][aria-selected="true"]{background:var(--red)
 <script>
 (function(){
 "use strict";
-const APP="GESTAT",APP_VERSION=6;
+const APP="GESTAT",APP_VERSION=7;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
@@ -714,7 +714,7 @@ function vCtl(a,b){const key=S.store+"|"+a+"|"+b;
   if(CTL.load.etat==="cours")return up+`<div class="empty-state">Lecture des journaux de tickets…</div>`;
   if(CTL.load.etat==="err")return up+`<div class="empty-state">${esc(CTL.load.err)}</div>`;
   const days=CTL.load.days||[];
-  if(!days.length)return up+`<div class="empty-state">Aucun journal de tickets pour ${S.vt.mode==="jour"?"le "+esc(vtDl(S.vt.d)):"cette période"}.<br><small>${ctlLocal()?"Les journaux viennent de la caisse Casio (Réglages → Caisse Casio). La caisse les garde depuis le 19/02/2026.":"Les journaux sont envoyés en ligne par le PC du magasin (programme GESTAT 1.1 avec la caisse Casio)."}</small></div>`;
+  if(!days.length)return up+`<div class="empty-state">Aucun journal de tickets pour ${S.vt.mode==="jour"?"le "+esc(vtDl(S.vt.d)):"cette période"}.<br><small>${ctlLocal()?"Les journaux viennent de la caisse Casio (Réglages → Connexion à la caisse Casio). Ils sont copiés sur ce PC au fil des jours : le Contrôle caisse commence au premier jour copié. Le journal du jour arrive le lendemain.":"Les journaux sont envoyés en ligne par le PC du magasin (programme GESTAT 1.1 avec la caisse Casio)."}</small></div>`;
   const A=ctlAgg(days),f=CTL.f,T=A.tot,pc=x=>A.ca?vtP(x/A.ca):"";
   const k=(t,sub)=>{const x=T[t]||{n:0,mt:0};return `<div class="kpi vtclk${f.t===t?" ctsel":""}" data-ct="t" data-v="${t}" title="Voir le détail"><div class="lbl">${CT_T[t][0]}</div><div class="v">${x.n}</div><div class="d">${sub(x)}</div></div>`};
   const kp=`<div class="grid kpis vtk ctk">${k("annul",x=>vtE(x.mt)+(x.mt?" · "+pc(x.mt)+" du CA":""))}${k("retour",x=>vtE(x.mt))}${k("aband",x=>vtE(x.mt)+" d'articles")}${k("tiroir",()=>"ouvertures sans vente")}${k("cbab",x=>vtE(x.mt))}${k("rem",x=>vtE(x.mt))}</div>`;
