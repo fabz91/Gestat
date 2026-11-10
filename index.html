@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>GESTAT</title>
 <script>/* version web : réglages Supabase dans config.js (à côté de index.html). Programme PC : fournis par le programme. */if(!window.api)document.write('<script src="config.js"><\/script>')</script>
-<meta name="gs-version" content="7">
+<meta name="gs-version" content="8">
 <style>
 /* Layout (repris de GESTIME) : bandeau blanc [icône + titre + magasin ⌂] [logo] [⚙], rangée de 4 grands onglets verts, sélecteur de période, puis cartes coiffées d'un bandeau rouge. */
 :root{
@@ -465,7 +465,7 @@ nav.tabs button[data-tab="controle"][aria-selected="true"]{background:var(--red)
 <script>
 (function(){
 "use strict";
-const APP="GESTAT",APP_VERSION=7;
+const APP="GESTAT",APP_VERSION=8;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
@@ -955,10 +955,10 @@ async function csTest(){const f=CS.f;CS.busy=true;CS.msg="Test en cours…";rend
 async function csCopie(){if(!csOk())return;CS.msg="";CS.prog={etape:"connexion",n:0,tot:0};renderModal();
   try{const e=await window.api.casioCopier();CS.prog=null;await csRefresh();
     CS.msg=e.ok?(e.nouveaux?"✓ "+e.nouveaux+" journées copiées. Elles partent maintenant dans la base en ligne.":"✓ Tout est déjà à jour."):"✗ "+(e.erreur||"échec");
-    if(e.ok&&e.nouveaux)csFin()}
+    if(e.ok)csFin()} // v8 : toujours relire après une copie réussie (les journaux de jrl.7z ne comptent pas comme « nouvelles journées »)
   catch(e){CS.prog=null;CS.msg="✗ "+(e.message||e)}renderModal()}
 if(csOk()){window.api.onCasioProg&&window.api.onCasioProg(p=>{CS.prog=p;
-  if(p.etape==="fini"||p.etape==="erreur"){CS.prog=null;csRefresh().then(()=>{if(S.modal)renderModal()});if(p.etape==="fini"&&p.nouveaux)csFin();return}
+  if(p.etape==="fini"||p.etape==="erreur"){CS.prog=null;csRefresh().then(()=>{if(S.modal)renderModal()});if(p.etape==="fini")csFin();return}
   const el=document.getElementById("csEtat");if(el)el.textContent=csEtatTxt()});
   csRefresh()}
 document.addEventListener("input",e=>{const t=e.target.closest("[data-csf]");if(t)CS.f[t.dataset.csf]=t.value});
