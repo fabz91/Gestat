@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>GESTAT</title>
 <script>/* version web : réglages Supabase dans config.js (à côté de index.html). Programme PC : fournis par le programme. */if(!window.api)document.write('<script src="config.js"><\/script>')</script>
-<meta name="gs-version" content="4">
+<meta name="gs-version" content="5">
 <style>
 /* Layout (repris de GESTIME) : bandeau blanc [icône + titre + magasin ⌂] [logo] [⚙], rangée de 4 grands onglets verts, sélecteur de période, puis cartes coiffées d'un bandeau rouge. */
 :root{
@@ -465,7 +465,7 @@ nav.tabs button[data-tab="controle"][aria-selected="true"]{background:var(--red)
 <script>
 (function(){
 "use strict";
-const APP="GESTAT",APP_VERSION=4;
+const APP="GESTAT",APP_VERSION=5;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
@@ -574,7 +574,7 @@ async function vtSb(path,opt,again){const c=vtCfgSb();if(!c)throw new Error("Bas
   if(r.status===401&&GA.has()&&!again){GA.drop();return vtSb(path,opt,true)}
   if((r.status===401||r.status===403)&&!GA.has()){gsLogin("La base est protégée : connectez cet appareil (identifiant G20).");throw new Error("Pas connecté : identifiant G20 nécessaire")}
   if(!r.ok){let t="";try{t=(await r.json()).message||""}catch(e){}throw new Error(r.status===404||/does not exist|schema cache/.test(t)?"Table « gesmar_ventes » absente : lancez le script pc/supabase-gesmar-ventes.sql dans Supabase":"Erreur "+r.status+(t?" : "+t:""))}
-  return r.status===204||r.status===201?null:r.json()}
+  if(r.status===204||r.status===201)return null;const tx=await r.text();return tx?JSON.parse(tx):null} // v5 : réponse « OK » vide (envoi déjà présent) : plus d'erreur « Unexpected end of JSON input »
 async function vtGet(a,b){const mag=S.store,want=vtDays(a,b).filter(d=>!(mag+"|"+d in VT.cache));
   if(want.length){
     if(vtLocal()){const L=await vtListLocal();const have=new Set((L.files||[]).map(f=>f.nom));
