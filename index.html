@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>GESTAT</title>
 <script>/* version web : réglages Supabase dans config.js (à côté de index.html). Programme PC : fournis par le programme. Sur fabz91.github.io (téléphone) : code d'accès GT1 commun avec GESTIME / GESMAR. */if(!window.api&&!/github\.io$/.test(location.hostname))document.write('<script src="config.js"><\/script>')</script>
-<meta name="gs-version" content="21">
+<meta name="gs-version" content="22">
 <style>
 /* Layout (repris de GESTIME) : bandeau blanc [icône + titre + magasin ⌂] [logo] [⚙], rangée de 4 grands onglets verts, sélecteur de période, puis cartes coiffées d'un bandeau rouge. */
 :root{
@@ -516,7 +516,7 @@ td mark,.ctdet mark{background:#fff1a8;color:#111;border-radius:3px;padding:0 1p
 <script>
 (function(){
 "use strict";
-const APP="GESTAT",APP_VERSION=21;
+const APP="GESTAT",APP_VERSION=22;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
@@ -883,7 +883,7 @@ async function ctlVoirRender(){let root=document.getElementById("ctRoot");if(!ro
     <div class="ctnote" style="margin:0">Ticket reconstitué tel qu'il a été imprimé, à partir du journal de la caisse${i0>=0?" ; en rouge : l'opération de la ligne choisie":""}.</div></div></div>`)}
 // en-tête du ticket (nom, adresse du magasin) : réglé une fois sur le PC du magasin, gardé sur ce PC
 // par défaut : en-tête et pied imprimés par la caisse du magasin (modifiables sur le PC)
-const CTL_ENT_DEF={clamart:{entete:"G20 CLAMART\n103 RUE DE LA BOURCILLIERE\n92140 CLAMART\nBIENVENUE !\nTEL: 01 46 31 16 73",pied:"OUVERT DU LUNDI AU DIMANCHE\nDE 08H30 A 20H00"}};
+const CTL_ENT_DEF={bredis:{entete:"G20 LONGJUMEAU\n1 PLACE BRETTEN\nBIENVENUE !\nTEL:01.69.34.35.73\nFAX:01.69.34.01.92",pied:"LUNDI AU DIMANCHE\n8H30 A 20H00"},clamart:{entete:"G20 CLAMART\n103 RUE DE LA BOURCILLIERE\n92140 CLAMART\nBIENVENUE !\nTEL: 01 46 31 16 73",pied:"OUVERT DU LUNDI AU DIMANCHE\nDE 08H30 A 20H00"}};
 const ctlLignes=e=>e?String(e).split("\n").map(l=>l.trim().toUpperCase()).filter(Boolean).slice(0,8):[];
 function ctlEntete(){const C=caCfg(),d=CTL_ENT_DEF[C.mag]||{};return ctlLignes(C.entete!=null?C.entete:d.entete)}
 function ctlPied(){const C=caCfg(),d=CTL_ENT_DEF[C.mag]||{};return ctlLignes(C.pied!=null?C.pied:d.pied)}
