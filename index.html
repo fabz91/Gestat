@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>GESTAT</title>
 <script>/* version web : réglages Supabase dans config.js (à côté de index.html). Programme PC : fournis par le programme. Sur fabz91.github.io (téléphone) : code d'accès GT1 commun avec GESTIME / GESMAR. */if(!window.api&&!/github\.io$/.test(location.hostname))document.write('<script src="config.js"><\/script>')</script>
-<meta name="gs-version" content="20">
+<meta name="gs-version" content="21">
 <style>
 /* Layout (repris de GESTIME) : bandeau blanc [icône + titre + magasin ⌂] [logo] [⚙], rangée de 4 grands onglets verts, sélecteur de période, puis cartes coiffées d'un bandeau rouge. */
 :root{
@@ -453,7 +453,7 @@ body.ph .ctnote{font-size:12px}
 .ctpr1{display:flex;align-items:center;gap:8px}.ctpm{margin-left:auto;white-space:nowrap}
 .ctpr2{font-size:12.5px;color:var(--muted);margin-top:3px}.ctpr2 b{color:var(--fg)}
 .ctpr3{font-size:13px;margin-top:3px;overflow-wrap:anywhere}
-.vthp{align-self:start}body.ph .vthp svg{max-height:260px}
+.vthp{align-self:start}body.ph .vtbar{display:none}body.ph .vtg th{width:auto!important}body.ph .vtg td.l:first-child{white-space:normal}body.ph .vtg td:nth-child(2){white-space:normal}body.ph .vtg table{font-size:12.5px}body.ph .vtg th,body.ph .vtg td{padding-left:6px;padding-right:6px}body.ph .vtg th{font-size:10.5px;letter-spacing:.03em}body.ph .vthp svg{max-height:260px}
 body.ph .kpis{grid-template-columns:1fr 1fr;gap:8px}body.ph .kpi{padding:10px 12px}body.ph .kpi .v{font-size:20px}body.ph .kpi .lbl{font-size:10.5px}body.ph .kpi .d{font-size:11.5px}
 
 .cthr{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;margin-left:6px}.cthr input{font:inherit;font-size:15px;font-weight:700;width:44px;min-width:44px;padding:5px 2px;text-align:center;border-radius:7px;border:1px solid var(--line,#888);background:var(--surface,#fff);color:inherit}.cthr input::-webkit-calendar-picker-indicator{display:none}.cthr input::-webkit-datetime-edit-fields-wrapper{padding:0}.cthr input::selection{background:#2f6fed;color:#fff}.cthh{padding-top:4px}.cthn{opacity:.65;font-weight:600;margin-left:2px}
@@ -516,7 +516,7 @@ td mark,.ctdet mark{background:#fff1a8;color:#111;border-radius:3px;padding:0 1p
 <script>
 (function(){
 "use strict";
-const APP="GESTAT",APP_VERSION=20;
+const APP="GESTAT",APP_VERSION=21;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
@@ -825,7 +825,7 @@ function vCtl(a,b){const key=S.store+"|"+a+"|"+b;
   const caisL=[...new Set(ctlRows(days).map(r=>r.cais).filter(Boolean))].sort();
   const chip=(k,v,lab,on)=>`<button class="btn small${on?" primary":""}" data-ct="${k}" data-v="${esc(v)}">${lab}</button>`;
   const filt=`<div class="ctrow"><span class="lb">Caissier</span>${chip("cais","","Tous",!f.cais)}${caisL.map(c=>chip("cais",c,esc(c),f.cais===c)).join("")}</div>
-    <div class="ctrow"><span class="lb">Type</span>${chip("t","","Tous ("+J0.length+")",!f.t)}${CT_ORD.filter(t=>nT[t]||f.t===t).map(t=>chip("t",t,CT_T[t][1]+" ("+(nT[t]||0)+")",f.t===t)).join("")}</div>
+    <div class="ctrow"><span class="lb">Type</span>${chip("t","",(avecTk?"Tous":"Toutes les opérations")+" ("+J0.length+")",!f.t)}${CT_ORD.filter(t=>nT[t]||f.t===t).map(t=>chip("t",t,CT_T[t][1]+" ("+(nT[t]||0)+")",f.t===t)).join("")}</div>
     <div class="ctrow"><span class="lb">Heure</span>${chip("hx","","Toutes",!f.hd&&!f.hf)}<span class="cthr">de <input type="text" inputmode="numeric" maxlength="2" class="ctht" id="ctHd" value="${esc(f.hd.slice(0,2))}" placeholder="--" aria-label="Heure de début"> h à <input type="text" inputmode="numeric" maxlength="2" class="ctht" id="ctHf" value="${esc(f.hf.slice(0,2))}" placeholder="--" aria-label="Heure de fin"> h</span></div>`;
   const nTk=J.filter(r=>r.t==="ticket"),sTk=nTk.reduce((s,r)=>s+(r.mt||0),0);
   const head=`<thead><tr>${multi?`<th class="l">Jour</th>`:""}<th>Heure</th><th>Caisse</th><th class="l">Caissier</th><th class="l">Type</th><th>N° ticket</th><th class="l">Détail</th><th>Montant</th><th class="l">Paiement</th><th class="l">Validé par</th>${loc?"<th>Ticket</th>":""}</tr></thead>`;
