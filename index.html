@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>GESTAT</title>
-<script>/* version web : réglages Supabase dans config.js (à côté de index.html). Programme PC : fournis par le programme. */if(!window.api)document.write('<script src="config.js"><\/script>')</script>
-<meta name="gs-version" content="14">
+<script>/* version web : réglages Supabase dans config.js (à côté de index.html). Programme PC : fournis par le programme. Sur fabz91.github.io (téléphone) : code d'accès GT1 commun avec GESTIME / GESMAR. */if(!window.api&&!/github\.io$/.test(location.hostname))document.write('<script src="config.js"><\/script>')</script>
+<meta name="gs-version" content="15">
 <style>
 /* Layout (repris de GESTIME) : bandeau blanc [icône + titre + magasin ⌂] [logo] [⚙], rangée de 4 grands onglets verts, sélecteur de période, puis cartes coiffées d'un bandeau rouge. */
 :root{
@@ -433,6 +433,28 @@ nav.tabs button[data-tab="controle"][aria-selected="true"]{background:var(--red)
 tr.cttot td{font-weight:800;background:var(--sunk)}
 .ctrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 12px 0}.ctrow:last-of-type{padding-bottom:10px}
 .ctrow .lb{font-size:12px;font-weight:700;color:var(--muted);min-width:70px}
+/* ---- v15 : GESTAT Web sur téléphone (classe body.ph) ---- */
+.appico.gsw{position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.appico .sw{position:absolute;left:-6px;bottom:-6px;width:18px;height:18px;border-radius:50%;background:#fff;border:1.5px solid #237a3b;color:#237a3b;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.appico .sw svg{width:12px!important;height:12px!important}
+body.ph nav.tabs{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;gap:6px;padding-bottom:6px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+body.ph nav.tabs::-webkit-scrollbar{display:none}
+body.ph nav.tabs button{width:auto!important;flex:none;min-width:0;padding:8px 12px;font-size:12px;margin:0!important}
+body.ph .band{font-size:13px}
+body.ph table{font-size:13px}
+body.ph .ctrow{gap:5px;padding:7px 10px 0}body.ph .ctrow .lb{min-width:100%;margin-bottom:-1px}
+body.ph .cthr{margin-left:0;width:100%}body.ph .cthr input{flex:1;min-width:0}
+body.ph .cthh .ctnote{display:none}
+body.ph .ctnote{font-size:12px}
+.ctpc{padding:10px 12px;border-bottom:1px solid var(--line)}.ctpc.cttot{background:var(--sunk)}
+.ctpch{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:15px}.ctpch span{font-size:14px;white-space:nowrap}
+.ctpct{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:6px;font-size:13px;color:var(--muted)}.ctpci{display:inline-flex;align-items:center;gap:4px}
+.ctpr{padding:9px 12px;border-bottom:1px solid var(--line);font-size:14px}.ctpr.cttot{background:var(--sunk)}
+.ctpr1{display:flex;align-items:center;gap:8px}.ctpm{margin-left:auto;white-space:nowrap}
+.ctpr2{font-size:12.5px;color:var(--muted);margin-top:3px}.ctpr2 b{color:var(--fg)}
+.ctpr3{font-size:13px;margin-top:3px;overflow-wrap:anywhere}
+body.ph .kpis{grid-template-columns:1fr 1fr;gap:8px}body.ph .kpi{padding:10px 12px}body.ph .kpi .v{font-size:20px}body.ph .kpi .lbl{font-size:10.5px}body.ph .kpi .d{font-size:11.5px}
+
 .cthr{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;margin-left:6px}.cthr input{font:inherit;padding:4px 6px;border-radius:7px;border:1px solid var(--line,#888);background:var(--sunk);color:inherit}.cthh{padding-top:4px}.cthn{opacity:.65;font-weight:600;margin-left:2px}
 td.ctdet{white-space:normal;min-width:240px;max-width:460px}
 td mark,.ctdet mark{background:#fff1a8;color:#111;border-radius:3px;padding:0 1px}
@@ -493,7 +515,7 @@ td mark,.ctdet mark{background:#fff1a8;color:#111;border-radius:3px;padding:0 1p
 <script>
 (function(){
 "use strict";
-const APP="GESTAT",APP_VERSION=14;
+const APP="GESTAT",APP_VERSION=15;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
@@ -527,12 +549,13 @@ const GA=(()=>{const SK="horaires-auth",ID_DOM="@hotmail.com";let tok=null,exp=0
   const login=(c,id,pw)=>grant(c,{email:idMail(id),password:pw},"password");
   const who=()=>{let m="";try{m=localStorage.getItem(SK+"-mail")||""}catch(e){}return m.toLowerCase().endsWith(ID_DOM)?m.slice(0,-ID_DOM.length).toUpperCase():m};
   return{has,token,lost,drop,login,who}})();
-function gsLogin(msg){if(S.lgLater&&!msg)return;let o=document.getElementById("lg");if(!o){o=document.createElement("div");o.id="lg";document.body.appendChild(o)}
-  o.innerHTML=`<div class="lgb"><h2>🔒 Connexion à GESTAT</h2><p>Une seule fois sur cet appareil : ensuite GESTAT reste connecté. Même identifiant que GESTIME et GESMAR (G20).</p><input id="lge" type="text" placeholder="Identifiant" autocomplete="username" autocapitalize="off" spellcheck="false"><input id="lgp" type="password" placeholder="Mot de passe" autocomplete="current-password"><button class="btn primary" id="lgo" style="padding:11px;font-size:15px">Se connecter</button><button class="btn" id="lgl" style="padding:9px;font-size:14px">Plus tard</button><div id="lgm">${esc(msg||"")}</div></div>`}
-async function gsDoLogin(){const m=document.getElementById("lgm"),c=SYNC.cfg();if(!c){m.textContent="Base en ligne non réglée (config.js).";return}
+function gsLogin(msg){if(PC&&S.lgLater&&!msg)return;const need=!SYNC.cfg();let o=document.getElementById("lg");if(!o){o=document.createElement("div");o.id="lg";document.body.appendChild(o)}
+  o.innerHTML=`<div class="lgb"><h2>🔒 Connexion à GESTAT</h2><p>Une seule fois sur cet appareil : ensuite GESTAT reste connecté. Même identifiant que GESTIME et GESMAR (G20).</p>${need?'<input id="lgc" type="text" placeholder="Code d’accès (GT1-…)" autocomplete="off" autocapitalize="off" spellcheck="false">':""}<input id="lge" type="text" placeholder="Identifiant" autocomplete="username" autocapitalize="off" spellcheck="false"><input id="lgp" type="password" placeholder="Mot de passe" autocomplete="current-password"><button class="btn primary" id="lgo" style="padding:11px;font-size:15px">Se connecter</button>${PC?'<button class="btn" id="lgl" style="padding:9px;font-size:14px">Plus tard</button>':""}<div id="lgm">${esc(msg||"")}</div></div>`}
+async function gsDoLogin(){const m=document.getElementById("lgm"),ci=document.getElementById("lgc");let c=SYNC.cfg(),nc=null;
+  if(!c){nc=!PC?gtCode(ci&&ci.value):null;if(!nc){m.textContent=PC?"Base en ligne non réglée (config.js).":"Code d’accès incorrect : collez-le en entier (il commence par GT1-).";return}c=nc}
   const id=document.getElementById("lge").value,pw=document.getElementById("lgp").value;if(!id.trim()||!pw){m.textContent="Tapez l’identifiant et le mot de passe.";return}
   m.textContent="Connexion…";document.getElementById("lgo").disabled=true;
-  try{await GA.login(c,id,pw);document.getElementById("lg").remove();VT.cache={};VT.load=null;render();if(S.modal)renderModal()}
+  try{await GA.login(c,id,pw);if(nc)try{localStorage.setItem("gt-cfg",JSON.stringify(nc))}catch(e){}document.getElementById("lg").remove();VT.cache={};VT.load=null;render();if(S.modal)renderModal()}
   catch(e){const b=document.getElementById("lgo");if(b)b.disabled=false;m.textContent=e.message==="OFFLINE"?"Pas de connexion internet : réessayez.":"Connexion refusée : "+e.message+"."}}
 document.addEventListener("click",e=>{if(e.target.id==="lgo"){gsDoLogin();return}if(e.target.id==="lgl"){S.lgLater=true;const o=document.getElementById("lg");if(o)o.remove();return}
   if(e.target.closest('[data-gs="login"]')){S.modal=false;renderModal();gsLogin("");return}
@@ -540,7 +563,10 @@ document.addEventListener("click",e=>{if(e.target.id==="lgo"){gsDoLogin();return
     try{["horaires-auth","horaires-auth-at","horaires-auth-mail"].forEach(k=>localStorage.removeItem(k))}catch(_){}location.reload()}});
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="lgp")gsDoLogin()});
 // Base en ligne (adresse et clé dans config.js, jamais dans le dépôt)
-const SYNC={cfg(){const c=window.SYNC&&window.SYNC.url&&window.SYNC.key&&!/VOTRE/.test(window.SYNC.url)?{url:String(window.SYNC.url).trim().replace(/\/+$/,""),key:String(window.SYNC.key).trim()}:null;return c}};
+const SYNC={cfg(){const c=window.SYNC&&window.SYNC.url&&window.SYNC.key&&!/VOTRE/.test(window.SYNC.url)?{url:String(window.SYNC.url).trim().replace(/\/+$/,""),key:String(window.SYNC.key).trim()}:null;return c||(!PC?gtCfg():null)}};
+// Code d'accès GT1 (collé une fois dans GESTIME Web, GESMAR Web ou ici) : adresse + clé publishable de Supabase, gardés sur le téléphone, jamais dans le dépôt.
+function gtCfg(){try{const c=JSON.parse(localStorage.getItem("gt-cfg")||"null");if(c&&c.url&&c.key)return c}catch(e){}return null}
+function gtCode(t){const m=/^GT1-([A-Za-z0-9+/=_-]+)$/.exec(String(t||"").replace(/\s+/g,""));if(!m)return null;try{const p=atob(m[1].replace(/-/g,"+").replace(/_/g,"/")).split("|");if(/^https:\/\/[a-z0-9]+\.supabase\.co$/.test(p[0])&&p[1])return{url:p[0],key:p[1]}}catch(e){}return null}
 // Caisse de ce PC : le magasin dont les fichiers Videor sont sur ce PC (choisi une fois dans les réglages)
 let CA_CFG=null;
 function caCfg(){if(!CA_CFG){try{CA_CFG=JSON.parse(rawLoad("gestat-caisse")||"null")}catch(e){CA_CFG=null}CA_CFG=CA_CFG||{}}return CA_CFG}
@@ -597,10 +623,11 @@ let VT_LIST=null;
 async function vtListLocal(force){if(!VT_LIST||force||Date.now()-VT_LIST.t>60000){const L=await window.api.caLister();VT_LIST={t:Date.now(),L}}return VT_LIST.L}
 function vtCfgSb(){try{return SYNC.cfg()}catch(e){return null}}
 async function vtSb(path,opt,again){const c=vtCfgSb();if(!c)throw new Error("Base en ligne non réglée");
-  const au=GA.has()?{Authorization:"Bearer "+await GA.token(c)}:(c.key.split(".").length===3?{Authorization:"Bearer "+c.key}:{}); // v2 : compte G20 si connecté
+  if(!PC&&!GA.has()){gsLogin("");throw new Error("Pas connecté : identifiant G20 nécessaire")}
+  const au=GA.has()||!PC?{Authorization:"Bearer "+await GA.token(c)}:(c.key.split(".").length===3?{Authorization:"Bearer "+c.key}:{}); // v2 : compte G20 si connecté
   const r=await fetch(c.url+"/rest/v1/"+path,Object.assign({},opt,{headers:Object.assign({apikey:c.key,"Content-Type":"application/json"},au,opt&&opt.headers)}));
   if(r.status===401&&GA.has()&&!again){GA.drop();return vtSb(path,opt,true)}
-  if((r.status===401||r.status===403)&&!GA.has()){gsLogin("La base est protégée : connectez cet appareil (identifiant G20).");throw new Error("Pas connecté : identifiant G20 nécessaire")}
+  if((r.status===401||r.status===403)&&!GA.has()){if(!PC)GA.lost();gsLogin("La base est protégée : connectez cet appareil (identifiant G20).");throw new Error("Pas connecté : identifiant G20 nécessaire")}
   if(!r.ok){let t="";try{t=(await r.json()).message||""}catch(e){}throw new Error(r.status===404||/does not exist|schema cache/.test(t)?"Table « gesmar_ventes » absente : lancez le script pc/supabase-gesmar-ventes.sql dans Supabase":"Erreur "+r.status+(t?" : "+t:""))}
   if(r.status===204||r.status===201)return null;const tx=await r.text();return tx?JSON.parse(tx):null} // v5 : réponse « OK » vide (envoi déjà présent) : plus d'erreur « Unexpected end of JSON input »
 async function vtGet(a,b){const mag=S.store,want=vtDays(a,b).filter(d=>!(mag+"|"+d in VT.cache));
@@ -779,7 +806,9 @@ function vCtl(a,b){const key=S.store+"|"+a+"|"+b;
   const cel=(m,t,n,btn)=>n&&btn!==false?`<button class="ctc${f.cais===m.nm&&f.t===t?" on":""}" data-ct="mx" data-c="${esc(m.nm)}" data-t="${t}" title="Voir la liste">${n}</button>`:`<span class="${n?"ctn":"ct0"}">${n}</span>`;
   const mrow=m=>{
     return `<tr${m.nm?"":` class="cttot"`}><td class="l"><b>${m.nm?esc(m.nm):"TOTAL"}</b></td><td>${cel(m,"ticket",m.n,avecTk)}</td><td>${vtE(m.ca)}</td>${evT.map(t=>`<td>${cel(m,t,m.t[t]||0)}</td>`).join("")}</tr>`};
-  const mx=`<div class="panel flush vtg"><div class="band">Par caissier et par type d'opération <span class="vtsub">cliquez sur un chiffre pour voir la liste</span></div><div class="scroll"><table><thead><tr><th class="l">Caissier</th><th>Tickets</th><th>Montant</th>${evT.map(t=>`<th>${CT_T[t][0]}</th>`).join("")}</tr></thead><tbody>${L.map(mrow).join("")}${L.length>1?mrow(TT):""}</tbody></table></div></div>`;
+  const PH=document.body.classList.contains("ph");
+  const mxPh=()=>`<div class="panel flush vtg"><div class="band">Par caissier <span class="vtsub">touchez un chiffre pour voir la liste</span></div>${(L.length>1?L.concat([TT]):L).map(m=>`<div class="ctpc${m.nm?"":" cttot"}"><div class="ctpch"><b>${m.nm?esc(m.nm):"TOTAL"}</b><span>${cel(m,"ticket",m.n,avecTk)} tickets · <b>${vtE(m.ca)}</b></span></div><div class="ctpct">${evT.filter(t=>m.t[t]).map(t=>`<span class="ctpci">${cel(m,t,m.t[t])} ${esc(CT_T[t][0])}</span>`).join("")||`<span class="ctnote" style="margin:0">aucune opération</span>`}</div></div>`).join("")}</div>`;
+  const mx=PH?mxPh():`<div class="panel flush vtg"><div class="band">Par caissier et par type d'opération <span class="vtsub">cliquez sur un chiffre pour voir la liste</span></div><div class="scroll"><table><thead><tr><th class="l">Caissier</th><th>Tickets</th><th>Montant</th>${evT.map(t=>`<th>${CT_T[t][0]}</th>`).join("")}</tr></thead><tbody>${L.map(mrow).join("")}${L.length>1?mrow(TT):""}</tbody></table></div></div>`;
   // ---- liste de toutes les opérations ----
   const toks=ctNorm(f.q).split(/\s+/).filter(Boolean);
   let J0=ctlRows(days);if(!avecTk)J0=J0.filter(r=>r.t!=="ticket");
@@ -805,7 +834,10 @@ function vCtl(a,b){const key=S.store+"|"+a+"|"+b;
   const ncol=(multi?1:0)+10+(loc?1:0);
   const tit=[f.cais||"tous les caissiers",f.t?(CT_T[f.t]||CT_T.autre)[0].toLowerCase():"tous les types",...(f.hd||f.hf?[(f.hd?"de "+f.hd.replace(":","h")+" ":"")+(f.hf?"à "+f.hf.replace(":","h"):"jusqu'à la fermeture")]:[])].join(" · ")+(f.q.trim()?" · « "+f.q.trim()+" »":"");
   const jr=`<div class="panel flush vtg" id="ctListe"><div class="band">Toutes les opérations <span class="vtsub">${esc(tit)}</span></div>${filt}
-    ${J.length?`<div class="scroll"><table>${head}<tbody>${J.slice(0,f.lim).map((r,ix)=>ctlTr(r,ix,toks,multi,loc)).join("")}
+    ${J.length&&PH?`<div class="ctpl">${J.slice(0,f.lim).map(r=>{const T=CT_T[r.t]||CT_T.autre;return `<div class="ctpr"><div class="ctpr1"><b>${multi?esc(vtDl(r.d))+" ":""}${esc(r.h||"")}</b> <span class="ctt ct-${esc(r.t)}">${esc(T[1])}</span><b class="ctpm">${ctMt(r)}</b></div><div class="ctpr2"><b>${ctHl(r.cais||"",toks)}</b>${r.tk?" · ticket "+ctHl(String(r.tk),toks):""}${r.c?" · caisse "+esc(r.c):""}</div><div class="ctpr3">${ctlDet(r,toks)}</div>${r.pay||r.val?`<div class="ctpr2">${ctHl(r.pay||"",toks)}${r.val?(r.pay?" · ":"")+"validé par "+esc(r.val):""}</div>`:""}</div>`}).join("")}
+      <div class="ctpr cttot"><b>TOTAL · ${J.length} ligne${J.length>1?"s":""}</b>${nTk.length?" · "+nTk.length+" tickets · "+vtE(sTk):""}</div></div>
+    ${J.length>f.lim?`<div style="padding:10px;text-align:center"><button class="btn small" data-ct="plus">Afficher plus (${J.length-f.lim} de plus)</button></div>`:""}`
+    :J.length?`<div class="scroll"><table>${head}<tbody>${J.slice(0,f.lim).map((r,ix)=>ctlTr(r,ix,toks,multi,loc)).join("")}
       <tr class="cttot"><td class="l" colspan="${(multi?1:0)+6}">TOTAL · ${J.length} ligne${J.length>1?"s":""}${nTk.length?" dont "+nTk.length+" ticket"+(nTk.length>1?"s":""):""}</td><td>${nTk.length?vtE(sTk):""}</td><td class="l" colspan="${ncol-(multi?1:0)-7}">${nTk.length?"encaissés":""}</td></tr></tbody></table></div>
     ${J.length>f.lim?`<div style="padding:10px;text-align:center"><button class="btn small" data-ct="plus">Afficher plus (${J.length-f.lim} de plus)</button></div>`:""}`:`<div class="empty-state" style="padding:14px">Aucune opération ne correspond.</div>`}</div>`;
   const note=!loc?`<div class="ctnote">Les tickets eux-mêmes ne sont consultables que sur le PC du magasin. Ici : le tableau par caissier et la liste des opérations.</div>`
@@ -1153,9 +1185,30 @@ document.addEventListener("click",async e=>{
   else if(k==="maj"){if(PC)majApply();else{S.majMsg="La version en ligne se met à jour toute seule.";renderModal()}}
   else if(k==="theme"){try{localStorage.setItem("gestat.theme",v)}catch(_){}applyTheme();render()}});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.modal){S.modal=S.modal===true?false:true;renderModal()}});
+/* ================= v15 : GESTAT Web sur téléphone (fabz91.github.io/Gestat/) =================
+   Même adresse que GESTIME Web et GESMAR Web : une seule icône « GES » sur l'iPhone, même connexion G20, même magasin.
+   Les tickets eux-mêmes restent sur le PC du magasin : le téléphone voit les ventes et le résumé de la caisse envoyés en ligne. */
+/* GES sur téléphone : toucher l'icône du logiciel ouvre le choix GESMAR / GESTIME / GESTAT (même adresse, même connexion, même magasin) */
+function gesMenu(cur,store){const A=[["gesmar","GESMAR","Marges, saisie, avoirs","../gesmar/"],["gestime","GESTIME","Plannings et heures","../gestime/"],["gestat","GESTAT","Ventes et caisse","../Gestat/"]];
+  let o=document.getElementById("gesMenu");if(o){o.remove();return}
+  if(!document.getElementById("gesMenuCss")){const st=document.createElement("style");st.id="gesMenuCss";st.textContent='#gesMenu{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center}#gesMenu .gmb{background:#fff;color:#1d1d1f;width:100%;max-width:460px;border-radius:18px 18px 0 0;padding:14px 14px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -6px 24px rgba(0,0,0,.25);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}#gesMenu h3{margin:2px 4px 10px;font-size:15px;color:#6b6b70;font-weight:700;letter-spacing:.06em}#gesMenu button{display:flex;width:100%;align-items:center;gap:12px;text-align:left;border:1.5px solid #e2e2e2;background:#fff;color:inherit;border-radius:12px;padding:12px 14px;margin:0 0 8px;font:inherit;cursor:pointer}#gesMenu button b{font-size:17px;letter-spacing:.04em;display:block}#gesMenu button span{font-size:13px;color:#6b6b70}#gesMenu button.on{border-color:#237a3b;background:#eef7f0}#gesMenu button i{margin-left:auto;font-style:normal;font-size:12px;font-weight:700;color:#237a3b}#gesMenu .gmx{justify-content:center;border:none;background:#f1f1f1;font-weight:700;margin:4px 0 0}';document.head.appendChild(st)}
+  o=document.createElement("div");o.id="gesMenu";o.setAttribute("role","dialog");o.setAttribute("aria-label","Changer de logiciel");
+  o.innerHTML='<div class="gmb"><h3>CHANGER DE LOGICIEL</h3>'+A.map(a=>'<button data-ga="'+a[0]+'"'+(a[0]===cur?' class="on"':'')+'><div><b>'+a[1]+'</b><span>'+a[2]+'</span></div>'+(a[0]===cur?'<i>ouvert</i>':'')+'</button>').join("")+'<button class="gmx" data-ga="">Fermer</button></div>';
+  o.addEventListener("click",e=>{const b=e.target.closest("[data-ga]");if(!b&&e.target!==o)return;const k=b?b.dataset.ga:"";o.remove();if(!k||k===cur)return;const a=A.find(x=>x[0]===k);
+    try{localStorage.setItem("ges-app",k);const m=store();if(m){localStorage.setItem("gesmar.store",m);localStorage.setItem("gt-store",m);localStorage.setItem("gestat.store",m)}}catch(_){}location.href=a[3]});
+  document.body.appendChild(o)}
+const PHW=()=>!PC&&Math.min(window.innerWidth||9999,(screen&&screen.width)||9999)<=640;
+function phApply(){const on=PHW();document.body.classList.toggle("ph",on);return on}
+let phW=window.innerWidth;window.addEventListener("resize",()=>{if(Math.abs(window.innerWidth-phW)<40)return;phW=window.innerWidth;const was=document.body.classList.contains("ph");if(phApply()!==was)render()});
+if(!PC){try{localStorage.setItem("ges-app","gestat")}catch(e){}
+  (function(){const ic=document.querySelector(".appico");if(!ic)return;const go=e=>{if(e)e.preventDefault();gesMenu("gestat",()=>S.store)};
+    ic.removeAttribute("aria-hidden");ic.setAttribute("role","button");ic.setAttribute("tabindex","0");ic.setAttribute("aria-label","Changer de logiciel");ic.title="Changer de logiciel";ic.classList.add("gsw");
+    ic.insertAdjacentHTML("beforeend",'<span class="sw" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg></span>');
+    ic.addEventListener("click",go);ic.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" ")go(e)})})()}
 // ---- démarrage ----
-render();caisseIci();
-if(SYNC.cfg()&&!GA.has())setTimeout(()=>gsLogin(""),1500); // v2 : proposé une fois au démarrage
+const phTabVue=()=>{if(!document.body.classList.contains("ph"))return;const b=document.querySelector('nav.tabs button[aria-selected="true"]'),n=b&&b.parentNode;if(n)n.scrollLeft=Math.max(0,b.offsetLeft-(n.clientWidth-b.offsetWidth)/2)};
+phApply();render();caisseIci();setTimeout(phTabVue,50);document.addEventListener("click",e=>{if(e.target.closest("nav.tabs button"))setTimeout(phTabVue,30)});
+if((SYNC.cfg()||!PC)&&!GA.has())setTimeout(()=>gsLogin(""),PC?1500:300); // v2 : proposé une fois au démarrage
 if(PC&&window.api.updateCheck){let last=0;const auto=()=>{if(Date.now()-last<60000||S.majBusy)return;last=Date.now();const was=S.majNew;majCheck(true).then(()=>{if(S.majNew!==was)render()})};
   setTimeout(auto,4000);setInterval(()=>{last=0;auto()},600000);window.addEventListener("focus",auto);
   const H=21;let fait=new Date().getHours()>=H?new Date().toDateString():"";
