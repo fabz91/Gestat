@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>GESTAT</title>
 <script>/* version web : réglages Supabase dans config.js (à côté de index.html). Programme PC : fournis par le programme. */if(!window.api)document.write('<script src="config.js"><\/script>')</script>
-<meta name="gs-version" content="13">
+<meta name="gs-version" content="14">
 <style>
 /* Layout (repris de GESTIME) : bandeau blanc [icône + titre + magasin ⌂] [logo] [⚙], rangée de 4 grands onglets verts, sélecteur de période, puis cartes coiffées d'un bandeau rouge. */
 :root{
@@ -493,7 +493,7 @@ td mark,.ctdet mark{background:#fff1a8;color:#111;border-radius:3px;padding:0 1p
 <script>
 (function(){
 "use strict";
-const APP="GESTAT",APP_VERSION=13;
+const APP="GESTAT",APP_VERSION=14;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
@@ -818,6 +818,12 @@ async function ctlTxt(f){if(CTL.txt.f===f&&CTL.txt.blocs)return CTL.txt.blocs;co
 function ctlVoir(k){const r=CTL.list[k];if(!r||r.f==null||r.b==null)return;CTL.voir={k,r};ctlVoirRender()}
 function ctlFermer(){CTL.voir=null;ctlVoirRender()}
 function ctlTkDuJour(r){const D=CTL.cache[S.store+"|"+r.d];return((D&&D.tk)||[]).filter(t=>t.f===r.f).sort((u,w)=>u.b-w.b)}
+// Ticket précédent / suivant : avec un filtre (caissier, type, recherche, heure), on suit la liste filtrée ;
+// sans filtre, on suit la caisse (ticket d'avant / d'après sur la même caisse, le même jour)
+const ctlFiltre=()=>{const f=CTL.f;return!!(f.cais||f.t||f.q.trim()||f.hd||f.hf)};
+function ctlListeVoisin(dir){const V=CTL.voir;if(!V)return -1;const L=CTL.list,cle=r=>r.d+"|"+r.f+"|"+r.b,c=cle(V.r);
+  for(let k=V.k+dir;k>=0&&k<L.length;k+=dir){const r=L[k];if(r.f!=null&&r.b!=null&&cle(r)!==c)return k}return -1}
+function ctlNav(dir){if(ctlFiltre()&&!CTL.voir.hors){const k=ctlListeVoisin(dir);if(k>=0)ctlVoir(k);return}ctlTkNav(dir)}
 function ctlTkNav(dir){const V=CTL.voir;if(!V)return;const T=ctlTkDuJour(V.r);const t=dir<0?T.filter(x=>x.b<V.r.b).pop():T.find(x=>x.b>V.r.b);if(!t)return;CTL.voir={k:V.k,r:ctTkRow(t,V.r.d),hors:true};ctlVoirRender()}
 async function ctlVoirRender(){let root=document.getElementById("ctRoot");if(!root){root=document.createElement("div");root.id="ctRoot";document.body.appendChild(root)}
   const V=CTL.voir;if(!V){root.innerHTML="";return}const r=V.r;
@@ -833,7 +839,7 @@ async function ctlVoirRender(){let root=document.getElementById("ctRoot");if(!ro
   const lignes=ent.map(l=>esc(" ".repeat(Math.max(0,Math.floor((larg-l.length)/2)))+l));if(ent.length)lignes.push("");
   B.forEach((x,ix)=>{if(saute.has(ix))return;const vl=x.k==="1"&&/^-{3,}>/.test(x.t.trim());if(x.k!=="0"&&!vl)return;const s=esc(ctlAff(x.t));lignes.push(ix>=i0&&ix<=i1?`<span class="hl">${s||" "}</span>`:vl?`<span class="vl">${s}</span>`:s)});
   const D=CTL.cache[S.store+"|"+r.d]||{},T=ctlTkDuJour(r),tk=T.find(t=>t.b===r.b),ops=(D.ev||[]).filter(e=>e.f===r.f&&e.b===r.b);
-  const prev=T.some(x=>x.b<r.b),next=T.some(x=>x.b>r.b),k=V.k,n=CTL.list.length;
+  const parListe=ctlFiltre()&&!V.hors,prev=parListe?ctlListeVoisin(-1)>=0:T.some(x=>x.b<r.b),next=parListe?ctlListeVoisin(1)>=0:T.some(x=>x.b>r.b);
   const h3=(r.tk?"Ticket n° "+r.tk:esc((CT_T[r.t]||CT_T.autre)[1]))+" · caisse "+esc(r.c||"")+" · "+esc(r.cais||"")+" · "+esc(vtDl(r.d))+(r.h?" à "+esc(r.h):"");
   const dl=`<dl><dt>Caissier</dt><dd>${esc(r.cais||"")}</dd><dt>Caisse</dt><dd>${esc(r.c||"")}</dd><dt>Date, heure</dt><dd>${esc(vtDl(r.d))}${r.h?", "+esc(r.h):""}</dd>
     <dt>Total payé</dt><dd>${tk?vtE(tk.tot)+(tk.pay?" · "+esc(tk.pay):""):"— (pas de ticket encaissé)"}</dd>${tk&&tk.nart?`<dt>Articles</dt><dd>${tk.nart}</dd>`:""}
@@ -841,7 +847,7 @@ async function ctlVoirRender(){let root=document.getElementById("ctRoot");if(!ro
   root.innerHTML=shell(h3,`<div class="ctvb"><div class="ctpap"><pre class="ctpre">${lignes.concat(ctlPied().length?["",...ctlPied().map(l=>esc(" ".repeat(Math.max(0,Math.floor((larg-l.length)/2)))+l))]:[]).join("\n")}</pre></div><div class="ctvi">${dl}
     <div class="ctnav"><button class="btn primary ctbig" data-ct="imprimer"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="4" y="9" width="16" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg> Imprimer</button></div>
     <div class="ctnav"><button class="btn ctbig" data-ct="tkn" data-v="-1" ${prev?"":"disabled"}>‹ Ticket précédent</button><button class="btn ctbig" data-ct="tkn" data-v="1" ${next?"":"disabled"}>Ticket suivant ›</button></div>
-    ${V.hors?"":`<div class="ctnav"><button class="btn ctbig" data-ct="lig" data-v="-1" ${k>0?"":"disabled"}>‹ Ligne précédente de la liste</button><button class="btn ctbig" data-ct="lig" data-v="1" ${k<n-1?"":"disabled"}>Ligne suivante ›</button></div>`}
+    ${parListe?`<div class="ctnote" style="margin:-8px 0 0">Précédent / suivant : dans la liste filtrée.</div>`:""}
     ${CTL.entEdit?`<div class="ctent"><b>En-tête du ticket</b> (nom du magasin, adresse, téléphone… une info par ligne)<textarea id="ctEnt" spellcheck="false">${esc(ctlEntete().join("\n"))}</textarea><b>Bas du ticket</b> (horaires…)<textarea id="ctPied" spellcheck="false" style="min-height:60px">${esc(ctlPied().join("\n"))}</textarea><div class="row"><button class="btn primary" data-ct="entok">Enregistrer</button><button class="btn" data-ct="entx">Annuler</button></div></div>`
       :`<div class="ctnav"><button class="btn" data-ct="ent">${ctlEntete().length?"Modifier l'en-tête et le bas du ticket":"Ajouter l'en-tête du magasin (adresse)"}</button></div>`}
     <div class="ctnote" style="margin:0">Ticket reconstitué tel qu'il a été imprimé, à partir du journal de la caisse${i0>=0?" ; en rouge : l'opération de la ligne choisie":""}.</div></div></div>`)}
@@ -861,7 +867,7 @@ function ctlImprimer(){const pre=document.querySelector("#ctRoot .ctpre");if(!pr
 document.addEventListener("click",e=>{const b=e.target.closest("[data-ct]");if(!b)return;const k=b.dataset.ct,v=b.dataset.v,f=CTL.f;
   if(k==="voir"){ctlVoir(+b.dataset.k);return}if(k==="fermer"){ctlFermer();return}if(k==="imprimer"){ctlImprimer();return}
   if(k==="ent"){CTL.entEdit=true;ctlVoirRender().then(()=>{const t=document.getElementById("ctEnt");if(t)t.focus()});return}if(k==="entok"){ctlEnteteSave();return}if(k==="entx"){CTL.entEdit=false;ctlVoirRender();return}
-  if(k==="lig"){if(CTL.voir)ctlVoir(CTL.voir.k+ +v);return}if(k==="tkn"){ctlTkNav(+v);return}
+  if(k==="tkn"){if(CTL.voir)ctlNav(+v);return}
   if(k==="t"){f.t=v;f.lim=300}else if(k==="cais"){f.cais=v;f.lim=300}else if(k==="hx"){f.hd="";f.hf="";f.lim=300}else if(k==="hp"){[f.hd,f.hf]=v.split("|");f.lim=300}
   else if(k==="hh"){const d=v+":00",fi=String(+v+1).padStart(2,"0")+":00",un=f.hd&&f.hf&&(+f.hf.slice(0,2))-(+f.hd.slice(0,2))===1&&f.hf.slice(2)===":00"&&f.hd.slice(2)===":00";
     if(un&&f.hd!==d){f.hd=f.hd<d?f.hd:d;f.hf=f.hf>fi?f.hf:fi}else if(un&&f.hd===d){f.hd="";f.hf=""}else{f.hd=d;f.hf=fi}f.lim=300}else if(k==="plus")f.lim+=300
