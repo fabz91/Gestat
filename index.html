@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>GESTAT</title>
 <script>/* version web : réglages Supabase dans config.js (à côté de index.html). Programme PC : fournis par le programme. */if(!window.api)document.write('<script src="config.js"><\/script>')</script>
-<meta name="gs-version" content="11">
+<meta name="gs-version" content="12">
 <style>
 /* Layout (repris de GESTIME) : bandeau blanc [icône + titre + magasin ⌂] [logo] [⚙], rangée de 4 grands onglets verts, sélecteur de période, puis cartes coiffées d'un bandeau rouge. */
 :root{
@@ -492,7 +492,7 @@ td mark,.ctdet mark{background:#fff1a8;color:#111;border-radius:3px;padding:0 1p
 <script>
 (function(){
 "use strict";
-const APP="GESTAT",APP_VERSION=11;
+const APP="GESTAT",APP_VERSION=12;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
@@ -832,16 +832,20 @@ async function ctlVoirRender(){let root=document.getElementById("ctRoot");if(!ro
   const dl=`<dl><dt>Caissier</dt><dd>${esc(r.cais||"")}</dd><dt>Caisse</dt><dd>${esc(r.c||"")}</dd><dt>Date, heure</dt><dd>${esc(vtDl(r.d))}${r.h?", "+esc(r.h):""}</dd>
     <dt>Total payé</dt><dd>${tk?vtE(tk.tot)+(tk.pay?" · "+esc(tk.pay):""):"— (pas de ticket encaissé)"}</dd>${tk&&tk.nart?`<dt>Articles</dt><dd>${tk.nart}</dd>`:""}
     ${ops.length?`<dt>Opérations</dt><dd>${ops.map(e=>`<div><span class="ctt ct-${esc(e.t)}">${esc((CT_T[e.t]||CT_T.autre)[1])}</span> ${esc(e.lib||"")}${e.mt?" "+ctMt(e):""}${e.val?" · validé par "+esc(e.val):""}</div>`).join("")}</dd>`:""}</dl>`;
-  root.innerHTML=shell(h3,`<div class="ctvb"><div class="ctpap"><pre class="ctpre">${lignes.join("\n")}</pre></div><div class="ctvi">${dl}
+  root.innerHTML=shell(h3,`<div class="ctvb"><div class="ctpap"><pre class="ctpre">${lignes.concat(ctlPied().length?["",...ctlPied().map(l=>esc(" ".repeat(Math.max(0,Math.floor((larg-l.length)/2)))+l))]:[]).join("\n")}</pre></div><div class="ctvi">${dl}
     <div class="ctnav"><button class="btn primary ctbig" data-ct="imprimer"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="4" y="9" width="16" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg> Imprimer</button></div>
     <div class="ctnav"><button class="btn ctbig" data-ct="tkn" data-v="-1" ${prev?"":"disabled"}>‹ Ticket précédent</button><button class="btn ctbig" data-ct="tkn" data-v="1" ${next?"":"disabled"}>Ticket suivant ›</button></div>
     ${V.hors?"":`<div class="ctnav"><button class="btn ctbig" data-ct="lig" data-v="-1" ${k>0?"":"disabled"}>‹ Ligne précédente de la liste</button><button class="btn ctbig" data-ct="lig" data-v="1" ${k<n-1?"":"disabled"}>Ligne suivante ›</button></div>`}
-    ${CTL.entEdit?`<div class="ctent"><b>En-tête du ticket</b> (nom du magasin, adresse, téléphone… une ligne par ligne)<textarea id="ctEnt" spellcheck="false">${esc(ctlEntete().join("\n"))}</textarea><div class="row"><button class="btn primary" data-ct="entok">Enregistrer</button><button class="btn" data-ct="entx">Annuler</button></div></div>`
-      :`<div class="ctnav"><button class="btn" data-ct="ent">${ctlEntete().length?"Modifier l'en-tête du ticket":"Ajouter l'en-tête du magasin (adresse)"}</button></div>`}
+    ${CTL.entEdit?`<div class="ctent"><b>En-tête du ticket</b> (nom du magasin, adresse, téléphone… une info par ligne)<textarea id="ctEnt" spellcheck="false">${esc(ctlEntete().join("\n"))}</textarea><b>Bas du ticket</b> (horaires…)<textarea id="ctPied" spellcheck="false" style="min-height:60px">${esc(ctlPied().join("\n"))}</textarea><div class="row"><button class="btn primary" data-ct="entok">Enregistrer</button><button class="btn" data-ct="entx">Annuler</button></div></div>`
+      :`<div class="ctnav"><button class="btn" data-ct="ent">${ctlEntete().length?"Modifier l'en-tête et le bas du ticket":"Ajouter l'en-tête du magasin (adresse)"}</button></div>`}
     <div class="ctnote" style="margin:0">Ticket reconstitué tel qu'il a été imprimé, à partir du journal de la caisse${i0>=0?" ; en rouge : l'opération de la ligne choisie":""}.</div></div></div>`)}
 // en-tête du ticket (nom, adresse du magasin) : réglé une fois sur le PC du magasin, gardé sur ce PC
-function ctlEntete(){const e=caCfg().entete;return e?String(e).split("\n").map(l=>l.trim().toUpperCase()).filter(Boolean).slice(0,8):[]}
-function ctlEnteteSave(){const t=document.getElementById("ctEnt");if(t){caCfg().entete=t.value.split("\n").map(l=>l.trim()).filter(Boolean).slice(0,8).join("\n");rawSave("gestat-caisse",JSON.stringify(caCfg()))}CTL.entEdit=false;ctlVoirRender()}
+// par défaut : en-tête et pied imprimés par la caisse du magasin (modifiables sur le PC)
+const CTL_ENT_DEF={clamart:{entete:"G20 CLAMART\n103 RUE DE LA BOURCILLIERE\n92140 CLAMART\nBIENVENUE !\nTEL: 01 46 31 16 73",pied:"OUVERT DU LUNDI AU DIMANCHE\nDE 08H30 A 20H00"}};
+const ctlLignes=e=>e?String(e).split("\n").map(l=>l.trim().toUpperCase()).filter(Boolean).slice(0,8):[];
+function ctlEntete(){const C=caCfg(),d=CTL_ENT_DEF[C.mag]||{};return ctlLignes(C.entete!=null?C.entete:d.entete)}
+function ctlPied(){const C=caCfg(),d=CTL_ENT_DEF[C.mag]||{};return ctlLignes(C.pied!=null?C.pied:d.pied)}
+function ctlEnteteSave(){const t=document.getElementById("ctEnt"),u=document.getElementById("ctPied"),n=x=>x.value.split("\n").map(l=>l.trim()).filter(Boolean).slice(0,8).join("\n");if(t&&u){caCfg().entete=n(t);caCfg().pied=n(u);rawSave("gestat-caisse",JSON.stringify(caCfg()))}CTL.entEdit=false;ctlVoirRender()}
 // impression : le ticket tient sur une seule feuille A4 (police réduite selon le nombre de lignes, 8 pt au plus, 5,5 pt au moins)
 function ctlImprimer(){const pre=document.querySelector("#ctRoot .ctpre");if(!pre)return;let z=document.getElementById("ctPrint");if(!z){z=document.createElement("div");z.id="ctPrint";document.body.appendChild(z)}
   const txt=pre.textContent.replace(/\s+$/,""),nl=txt.split("\n").length,fs=Math.max(5.5,Math.min(8,Math.floor(790/(nl*1.12)*10)/10));
