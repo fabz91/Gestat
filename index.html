@@ -450,7 +450,7 @@ td mark,.ctdet mark{background:#fff1a8;color:#111;border-radius:3px;padding:0 1p
 .ctvi dl{display:grid;grid-template-columns:110px 1fr;gap:6px 12px;margin:0;font-size:14px}.ctvi dt{color:var(--muted);font-weight:600}.ctvi dd{margin:0;font-weight:700}.ctvi dd div{margin-bottom:4px}
 .ctnav{display:flex;flex-wrap:wrap;gap:8px}.ctbig{font-size:14px;padding:10px 14px;min-height:42px}.ctbig[disabled]{opacity:.45;cursor:default}
 #ctPrint{display:none}
-@media print{body.ctprinting>*:not(#ctPrint){display:none!important}body.ctprinting>#ctPrint{display:block!important}#ctPrint pre{font:10.5pt/1.35 Consolas,"Courier New",monospace;margin:0;color:#000;white-space:pre}}
+@media print{@page{size:A4 portrait;margin:7mm 8mm}body.ctprinting>*:not(#ctPrint){display:none!important}body.ctprinting>#ctPrint{display:block!important}#ctPrint pre{font-family:Consolas,"Courier New",monospace;font-size:var(--ctfs,8pt);line-height:1.12;margin:0;color:#000;white-space:pre}}
 .ctchips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px}
 .ctinfo{margin:4px 0 10px;color:var(--muted);font-size:13px}
 </style>
@@ -633,6 +633,10 @@ if(VT_API()){setTimeout(vtUpload,45000);setInterval(vtUpload,15*60000)}
 // Les tickets eux-mêmes restent sur ce PC (choix du gérant, 11/11/2026). Un résumé par jour (compteurs + opérations, sans les tickets)
 // part dans gesmar_ventes (magasin « bredis.ctl ») : les autres appareils voient le tableau par caissier et la liste des opérations.
 // Plus de détection automatique (« À vérifier », caissiers en rouge) : retirée en v9.
+// affichage du ticket : cadres de la caisse (encodage DOS lu en latin1) remis en traits, texte double largeur « _2_._8_7 » remis en « 2.87 »
+const CTL_CADRE={"\u00b3":"│","\u00c4":"─","\u00da":"┌","\u00bf":"┐","\u00c0":"└","\u00d9":"┘","\u00c3":"├","\u00b4":"┤","\u00c2":"┬","\u00c1":"┴","\u00c5":"┼","\u00cd":"═","\u00ba":"║","\u00c9":"╔","\u00bb":"╗","\u00c8":"╚","\u00bc":"╝"};
+function ctlAff(t){t=String(t||"");if(/[\u00c4\u00b3]/.test(t))t=t.replace(/[\u00b3\u00c4\u00da\u00bf\u00c0\u00d9\u00c3\u00b4\u00c2\u00c1\u00c5\u00cd\u00ba\u00c9\u00bb\u00c8\u00bc]/g,c=>CTL_CADRE[c]);
+  return t.replace(/(?:_[^_\s]){3,}/g,m=>m.replace(/_/g,""))}
 function ctlBlocs(txt){const blocs=[];let cur=[];
   for(const raw of String(txt).split(/\r?\n/)){const l=raw.replace(/[\x00-\x1f]/g,"");
     if(l.trim()==="H13"){if(cur.length)blocs.push(cur);cur=[];continue}
@@ -816,7 +820,7 @@ async function ctlVoirRender(){let root=document.getElementById("ctRoot");if(!ro
   if(CTL.voir!==V)return;
   if(!B){root.innerHTML=shell("Ticket introuvable",`<div class="empty-state" style="padding:16px">Le journal ${esc(r.f)} n'est plus sur ce PC.</div>`);return}
   let i0=-1,i1=-1;if(r.t!=="ticket"&&r.i!=null){i0=r.i;i1=r.j!=null?r.j:r.i;if(B[i1+1]&&B[i1+1].k==="1"&&/^-{3,}>/.test(B[i1+1].t.trim()))i1++}
-  const lignes=[];B.forEach((x,ix)=>{const vl=x.k==="1"&&/^-{3,}>/.test(x.t.trim());if(x.k!=="0"&&!vl)return;const s=esc(x.t);lignes.push(ix>=i0&&ix<=i1?`<span class="hl">${s||" "}</span>`:vl?`<span class="vl">${s}</span>`:s)});
+  const lignes=[];B.forEach((x,ix)=>{const vl=x.k==="1"&&/^-{3,}>/.test(x.t.trim());if(x.k!=="0"&&!vl)return;const s=esc(ctlAff(x.t));lignes.push(ix>=i0&&ix<=i1?`<span class="hl">${s||" "}</span>`:vl?`<span class="vl">${s}</span>`:s)});
   const D=CTL.cache[S.store+"|"+r.d]||{},T=ctlTkDuJour(r),tk=T.find(t=>t.b===r.b),ops=(D.ev||[]).filter(e=>e.f===r.f&&e.b===r.b);
   const prev=T.some(x=>x.b<r.b),next=T.some(x=>x.b>r.b),k=V.k,n=CTL.list.length;
   const h3=(r.tk?"Ticket n° "+r.tk:esc((CT_T[r.t]||CT_T.autre)[1]))+" · caisse "+esc(r.c||"")+" · "+esc(r.cais||"")+" · "+esc(vtDl(r.d))+(r.h?" à "+esc(r.h):"");
@@ -828,8 +832,10 @@ async function ctlVoirRender(){let root=document.getElementById("ctRoot");if(!ro
     <div class="ctnav"><button class="btn ctbig" data-ct="tkn" data-v="-1" ${prev?"":"disabled"}>‹ Ticket précédent</button><button class="btn ctbig" data-ct="tkn" data-v="1" ${next?"":"disabled"}>Ticket suivant ›</button></div>
     ${V.hors?"":`<div class="ctnav"><button class="btn ctbig" data-ct="lig" data-v="-1" ${k>0?"":"disabled"}>‹ Ligne précédente de la liste</button><button class="btn ctbig" data-ct="lig" data-v="1" ${k<n-1?"":"disabled"}>Ligne suivante ›</button></div>`}
     <div class="ctnote" style="margin:0">Ticket reconstitué tel qu'il a été imprimé, à partir du journal de la caisse${i0>=0?" ; en rouge : l'opération de la ligne choisie":""}.</div></div></div>`)}
+// impression : le ticket tient sur une seule feuille A4 (police réduite selon le nombre de lignes, 8 pt au plus, 5,5 pt au moins)
 function ctlImprimer(){const pre=document.querySelector("#ctRoot .ctpre");if(!pre)return;let z=document.getElementById("ctPrint");if(!z){z=document.createElement("div");z.id="ctPrint";document.body.appendChild(z)}
-  z.innerHTML=`<pre>${esc(pre.textContent)}</pre>`;document.body.classList.add("ctprinting");
+  const txt=pre.textContent.replace(/\s+$/,""),nl=txt.split("\n").length,fs=Math.max(5.5,Math.min(8,Math.floor(790/(nl*1.12)*10)/10));
+  z.style.setProperty("--ctfs",fs+"pt");z.innerHTML=`<pre>${esc(txt)}</pre>`;document.body.classList.add("ctprinting");
   let fait=false;const fin=()=>{if(fait)return;fait=true;document.body.classList.remove("ctprinting");window.removeEventListener("afterprint",fin)};
   window.addEventListener("afterprint",fin);setTimeout(()=>{window.print();setTimeout(fin,60000)},30)}
 document.addEventListener("click",e=>{const b=e.target.closest("[data-ct]");if(!b)return;const k=b.dataset.ct,v=b.dataset.v,f=CTL.f;
