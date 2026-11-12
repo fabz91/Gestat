@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>GESTAT</title>
 <script>/* version web : réglages Supabase dans config.js (à côté de index.html). Programme PC : fournis par le programme. Sur fabz91.github.io (téléphone) : code d'accès GT1 commun avec GESTIME / GESMAR. */if(!window.api&&!/github\.io$/.test(location.hostname))document.write('<script src="config.js"><\/script>')</script>
-<meta name="gs-version" content="22">
+<meta name="gs-version" content="23">
 <style>
 /* Layout (repris de GESTIME) : bandeau blanc [icône + titre + magasin ⌂] [logo] [⚙], rangée de 4 grands onglets verts, sélecteur de période, puis cartes coiffées d'un bandeau rouge. */
 :root{
@@ -392,7 +392,7 @@ tr.lrow td{color:var(--bad);background:color-mix(in srgb,var(--bad) 9%,transpare
 .vtnav button{font:700 13px var(--body);border:0;background:transparent;color:var(--muted);border-radius:7px;padding:7px 13px;cursor:pointer}
 .vtnav button:hover{color:var(--fg)}.vtnav button.on{background:var(--green);color:#fff}
 .vtup{font-size:12px;color:var(--muted);margin:-6px 0 8px;min-height:0}.vtup:empty{display:none}
-.vtg{margin-top:14px}.vt3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.vtg{margin-top:14px}.vt3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}.vtfl3{align-items:start}.vtfl3 td.l{white-space:normal}
 .vtk .kpi .lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
 .vtbar{display:inline-block;vertical-align:middle;width:calc(100% - 66px);max-width:260px;height:10px;background:var(--sunk);border-radius:5px;overflow:hidden}.vtbar i{display:block;height:100%;background:var(--green);border-radius:5px}
 .vtsub{font:600 12px var(--body);letter-spacing:0;text-transform:none;opacity:.85;margin-left:8px}
@@ -516,7 +516,7 @@ td mark,.ctdet mark{background:#fff1a8;color:#111;border-radius:3px;padding:0 1p
 <script>
 (function(){
 "use strict";
-const APP="GESTAT",APP_VERSION=22;
+const APP="GESTAT",APP_VERSION=23;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
@@ -977,11 +977,50 @@ function vtSynth(A){const R=vtLst(A.ray).sort((u,w)=>w.ca-u.ca),H=vtLst(A.h).fil
   <div class="grid two vtg">
    <div class="panel flush"><div class="band">Meilleures ventes en CA</div><div class="scroll"><table><thead><tr><th class="l">Article</th><th>Qté</th><th>CA TTC</th><th>Part</th></tr></thead><tbody>${vtTopArt(A,"ca",15).map((e,i)=>vtArtRow(e,A,i+1)).join("")}</tbody></table></div></div>
    <div class="panel flush"><div class="band">Meilleures ventes en quantité <span class="vtsub">à l'unité</span></div><div class="scroll"><table><thead><tr><th class="l">Article</th><th>Qté</th><th>CA TTC</th><th>Part</th></tr></thead><tbody>${vtTopArt(A,"q",15,e=>!e.w).map((e,i)=>vtArtRow(e,A,i+1)).join("")}</tbody></table></div></div></div>
-  ${vtLst(A.art).some(e=>e.w)?`<div class="panel flush vtg"><div class="band">Produits au poids <span class="vtsub">en kilos</span></div><div class="scroll"><table><thead><tr><th class="l">Article</th><th>Poids vendu</th><th>CA TTC</th><th>Part</th></tr></thead><tbody>${vtTopArt(A,"q",15,e=>e.w).map((e,i)=>vtArtRow(e,A,i+1)).join("")}</tbody></table></div></div>`:""}
+  ${(()=>{ /* v23 : produits au poids coupés en deux tableaux + marge fruits et légumes du mois à côté (demande du gérant) */
+    const W=vtTopArt(A,"q",16,e=>e.w),t=(L,d)=>`<div class="panel flush"><div class="band">Produits au poids <span class="vtsub">en kilos${d?" · suite":""}</span></div><div class="scroll"><table><thead><tr><th class="l">Article</th><th>Poids</th><th>CA TTC</th><th>Part</th></tr></thead><tbody>${L.map((e,i)=>vtArtRow(e,A,i+1+d)).join("")}</tbody></table></div></div>`;
+    return `<div class="grid vtg vt3 vtfl3">${W.length?t(W.slice(0,8),0)+(W.length>8?t(W.slice(8),8):""):""}${vtFlPanel()}</div>`})()}
   <div class="grid vtg vt3">
    <div class="panel flush"><div class="band">Paiements</div><table><tbody>${vtLst(A.pay).filter(p=>p.ca||p.q).sort((u,w)=>w.ca-u.ca).map(p=>`<tr><td class="l">${esc(p.nm)}</td><td>${vtQ(p.q)}</td><td>${vtE(p.ca)}</td><td>${vtP(A.ca?p.ca/A.ca:0)}</td></tr>`).join("")}</tbody></table></div>
    <div class="panel flush"><div class="band">TVA</div><table><tbody>${vtLst(A.tva).map(p=>`<tr><td class="l">${esc(p.nm)}</td><td>${vtE(p.ca)} TTC</td></tr>`).join("")}</tbody></table></div>
    <div class="panel flush"><div class="band">Opérations de caisse</div><table><tbody>${vtLst(A.ops).filter(p=>p.q||p.ca).map(p=>`<tr><td class="l">${esc(p.nm)}</td><td>${vtQ(p.q)} fois</td><td>${vtE(p.ca)}</td></tr>`).join("")||`<tr><td class="l">Aucune</td></tr>`}</tbody></table></div></div>`}
+// ===== v23 : marge FRUITS ET LÉGUMES du mois =====
+// Ventes : rayon « FRUITS ET LEGUMES » des journées de caisse du 1er du mois jusqu'au jour affiché (pas la famille « FRUITS ET LEGUMES LS » du rayon FRAIS).
+// Achats : saisie GESMAR du même mois et des mêmes jours (table Supabase « gesmar », document magasins/<magasin>/mois/<AAAA-MM>),
+// fournisseurs fruits et légumes choisis par le gérant (par défaut : SAINT PRIM / LAURANCE). Tout en TTC, comme GESMAR. Sans les stocks.
+const vtIsFL=nm=>/fruit/i.test(nm)&&/l[eé]gum/i.test(nm)&&!/\bLS\b/i.test(nm);
+function vtFlCfg(){let o=null;try{o=JSON.parse(rawLoad("gestat-fl-"+S.store)||"null")}catch(e){}return o&&Array.isArray(o.ids)?o:null}
+function vtFlCfgSave(ids){rawSave("gestat-fl-"+S.store,JSON.stringify({ids}))}
+async function vtGmDocs(){const k=S.store,c=VT.gm;if(c&&c.k===k&&Date.now()-c.t<5*60000)return c.docs;
+  const rows=await vtSb("gesmar?id=eq."+encodeURIComponent(k)+"&select=data");const docs=(rows&&rows[0]&&rows[0].data&&rows[0].data.docs)||{};
+  VT.gm={k,t:Date.now(),docs};return docs}
+async function vtFlCalc(m,fin){const days=await vtGet(m+"-01",fin),A=vtAgg(days),R=vtLst(A.ray).filter(r=>vtIsFL(r.nm));
+  const ca=R.reduce((t,r)=>t+r.ca,0),kg=R.reduce((t,r)=>t+(r.kg||0),0);
+  const docs=await vtGmDocs(),pre="magasins/"+S.store+"/",F={};
+  for(const[p,d]of Object.entries(docs))if(p.startsWith(pre+"fournisseurs/")&&d)F[p.slice(pre.length+13)]=d.nom||p.slice(pre.length+13);
+  const M=docs[pre+"mois/"+m],par={};
+  for(const[dd,j]of Object.entries((M&&M.jours)||{})){if(m+"-"+dd>fin||!j||!j.achats)continue;
+    for(const[fid,v]of Object.entries(j.achats)){const x=+v;if(isFinite(x)&&x)par[fid]=(par[fid]||0)+x}}
+  return{ca,kg,nj:days.length,rayons:R.map(r=>r.nm),F,par,gmOk:!!M}}
+function vtFlPanel(){const v=S.vt,fin=v.mode==="jour"?v.d:v.b,m=String(fin).slice(0,7),key=S.store+"|"+m+"|"+fin;
+  if(!VT.fl||VT.fl.key!==key){VT.fl={key,etat:"cours"};vtFlCalc(m,fin).then(r=>{if(VT.fl.key===key){VT.fl.etat="ok";VT.fl.r=r}}).catch(e=>{if(VT.fl.key===key){VT.fl.etat="err";VT.fl.err=e.message||String(e)}}).finally(()=>render())}
+  const mn=["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"][+m.slice(5,7)-1]||"";
+  const head=`<div class="band">Marge fruits et légumes <span class="vtsub">1er au ${esc(fin.slice(8,10))} ${esc(mn)}</span></div>`;
+  if(VT.fl.etat==="cours")return `<div class="panel flush">${head}<div class="empty-state" style="padding:14px">Calcul…</div></div>`;
+  if(VT.fl.etat==="err")return `<div class="panel flush">${head}<div class="empty-state" style="padding:14px">${esc(VT.fl.err)}</div></div>`;
+  const r=VT.fl.r,cfg=vtFlCfg(),ids=cfg?cfg.ids:Object.keys(r.F).filter(id=>/saint\s*-?\s*prim|laurance/i.test(r.F[id])),
+    sel=ids.filter(id=>r.par[id]),ach=Math.round(ids.reduce((t,id)=>t+(r.par[id]||0),0)*100)/100,mg=r.ca-ach,tx=r.ca?mg/r.ca:null;
+  let h=`<table><tbody>
+   <tr><td class="l">Ventes TTC<br><span class="vtsub">rayon ${esc(r.rayons.join(", ")||"FRUITS ET LEGUMES")}${r.kg?" · "+vtKg(r.kg):""}</span></td><td>${vtE(r.ca)}</td></tr>
+   <tr><td class="l">Achats TTC<br><span class="vtsub">saisie GESMAR</span></td><td>${vtE(ach)}</td></tr>
+   ${sel.map(id=>`<tr class="vtl1"><td class="l">&nbsp;&nbsp;${esc(r.F[id]||id)}</td><td>${vtE(r.par[id])}</td></tr>`).join("")}
+   <tr class="tot"><td class="l">Marge</td><td>${vtE(mg)}</td></tr>
+   <tr class="tot"><td class="l">Taux de marge</td><td style="color:${tx==null?"inherit":tx<0?"var(--red)":"var(--green)"}">${tx==null?"—":vtP(tx)}</td></tr>
+  </tbody></table>
+  <div class="vtsub" style="padding:8px 12px 10px;line-height:1.35">${r.nj} jour${r.nj>1?"s":""} de caisse. Sans les stocks : un gros achat en fin de période baisse le taux, il remonte quand la marchandise est vendue.${!ids.length?" <b>Aucun fournisseur choisi.</b>":""}${!r.gmOk?" Pas encore de saisie GESMAR pour ce mois.":""}${!r.rayons.length&&r.nj?" <b>Rayon « fruits et légumes » introuvable dans les ventes.</b>":""}<div style="margin-top:8px"><button class="pillbtn" data-vt="flcfg">⚙ Fournisseurs comptés${v.flcfg?" ▴":" ▾"}</button></div></div>`;
+  if(v.flcfg){const L=Object.keys(r.F).sort((a,b)=>(r.par[b]||0)-(r.par[a]||0)||String(r.F[a]).localeCompare(String(r.F[b])));
+    h+=`<div style="padding:4px 12px 12px"><div class="vtsub" style="margin-bottom:6px">Fournisseurs comptés dans les achats fruits et légumes :</div>${L.map(id=>`<label style="display:flex;gap:8px;align-items:center;padding:3px 0;cursor:pointer"><input type="checkbox" data-flf="${esc(id)}"${ids.includes(id)?" checked":""}> ${esc(r.F[id])}${r.par[id]?` <span class="vtsub">${vtE(r.par[id])} ce mois</span>`:""}</label>`).join("")}</div>`}
+  return `<div class="panel flush">${head}${h}</div>`}
 function vtTree(A){const F=vtLst(A.fam),SF=vtLst(A.sf),AR=vtLst(A.art),fBy={},sBy={},aBy={};
   F.forEach(f=>(fBy[f.x]=fBy[f.x]||[]).push(f));SF.forEach(s=>(sBy[s.x]=sBy[s.x]||[]).push(s));AR.forEach(x=>(aBy[x.x]=aBy[x.x]||[]).push(x));
   return{fBy,sBy,aBy}}
@@ -1073,11 +1112,12 @@ document.addEventListener("click",e=>{const b=e.target.closest("[data-vt]");if(!
   if(k==="mode"){v.mode=val;v.lim=200}else if(k==="vue"){v.vue=val;v.lim=200}else if(k==="jour"){v.d=vtAdd(v.d,+b.dataset.n);if(v.d>todayISO())v.d=todayISO()}
   else if(k==="vite"){vtVite(val)}else if(k==="open"){v.open[val]=!v.open[val]}else if(k==="tri"){v.tri=val}else if(k==="plus"){v.lim+=500}
   else if(k==="tout"){if(val==="1"){const A=vtAgg(VT.load&&VT.load.days||[]);vtLst(A.ray).forEach(r=>v.open["r"+r.k]=1);vtLst(A.fam).forEach(f=>v.open["f"+f.k]=1)}else v.open={}}
-  else if(k==="ray"){v.vue="articles";v.ray=val;v.q="";v.lim=200}else if(k==="fiche"){v.vue="fiche";v.art=val;window.scrollTo(0,0)}else if(k==="abc"){v.abc=val;v.lim=200}
+  else if(k==="ray"){v.vue="articles";v.ray=val;v.q="";v.lim=200}else if(k==="fiche"){v.vue="fiche";v.art=val;window.scrollTo(0,0)}else if(k==="abc"){v.abc=val;v.lim=200}else if(k==="flcfg"){v.flcfg=!v.flcfg}
   S.tab=v.vue;try{localStorage.setItem("gestat.tab",S.tab)}catch(_){}vtSave();render()});
 document.addEventListener("change",e=>{const t=e.target,v=S.vt;if(false)return;
   if(t.id==="vtD"&&t.value){v.d=t.value;render()}else if(t.id==="vtA"&&t.value){v.a=t.value;if(v.b<v.a)v.b=v.a;render()}else if(t.id==="vtB"&&t.value){v.b=t.value;if(v.a>v.b)v.a=v.b;render()}
-  else if(t.id==="vtRay"){v.ray=t.value;v.lim=200;render()}});
+  else if(t.id==="vtRay"){v.ray=t.value;v.lim=200;render()}
+  else if(t.dataset&&t.dataset.flf!=null&&VT.fl&&VT.fl.r){const r=VT.fl.r,c=vtFlCfg(),ids=new Set(c?c.ids:Object.keys(r.F).filter(id=>/saint\s*-?\s*prim|laurance/i.test(r.F[id])));if(t.checked)ids.add(t.dataset.flf);else ids.delete(t.dataset.flf);vtFlCfgSave([...ids]);render()}});
 document.addEventListener("input",e=>{const t=e.target;if(false)return;
   if(t.id==="vtQ"||t.id==="vtArt"){if(t.id==="vtQ")S.vt.q=t.value;else S.vt.art=t.value;clearTimeout(VT.ti);VT.ti=setTimeout(()=>{const p=t.selectionStart;render();const n=document.getElementById(t.id);if(n){n.focus();try{n.setSelectionRange(p,p)}catch(_){}}},300)}});
 
