@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>GESTAT</title>
 <script>/* version web : réglages Supabase dans config.js (à côté de index.html). Programme PC : fournis par le programme. Sur fabz91.github.io (téléphone) : code d'accès GT1 commun avec GESTIME / GESMAR. */if(!window.api&&!/github\.io$/.test(location.hostname))document.write('<script src="config.js"><\/script>')</script>
-<meta name="gs-version" content="25">
+<meta name="gs-version" content="26">
 <style>
 /* Layout (repris de GESTIME) : bandeau blanc [icône + titre + magasin ⌂] [logo] [⚙], rangée de 4 grands onglets verts, sélecteur de période, puis cartes coiffées d'un bandeau rouge. */
 :root{
@@ -516,7 +516,7 @@ td mark,.ctdet mark{background:#fff1a8;color:#111;border-radius:3px;padding:0 1p
 <script>
 (function(){
 "use strict";
-const APP="GESTAT",APP_VERSION=25;
+const APP="GESTAT",APP_VERSION=26;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
@@ -941,12 +941,21 @@ const vtBar=(p,col)=>`<span class="vtbar"><i style="width:${Math.max(0,Math.min(
 const vtK=(lbl,v,d,cls)=>`<div class="kpi${cls?" "+cls:""}"><div class="lbl">${lbl}</div><div class="v">${v}</div>${d?`<div class="d">${d}</div>`:""}</div>`;
 // ---- vue ----
 function vtRange(){const v=S.vt,t=todayISO(),hier=vtAdd(t,-1);if(!v.d)v.d=hier;if(!v.b)v.b=hier;if(!v.a)v.a=vtAdd(v.b,-29);
-  if((v.vue==="fiche"||v.fic)&&v.mode==="jour")return[vtAdd(v.d,-89),v.d];
+  // v26 : fiche article : « Mois » (1, 3 ou 6 derniers mois jusqu'à hier) ou « Période » (du … au …)
+  if(v.fic){if(v.ficMode==="per")return[v.a,v.b];const n=v.ficM||3,d=new Date(hier+"T12:00:00Z");d.setUTCMonth(d.getUTCMonth()-n);return[vtAdd(d.toISOString().slice(0,10),1),hier]}
+  if(v.vue==="fiche"&&v.mode==="jour")return[vtAdd(v.d,-89),v.d];
   if(v.vue==="alertes")return[vtAdd(v.mode==="jour"?v.d:v.b,-34),v.mode==="jour"?v.d:v.b];
   return v.mode==="jour"?[v.d,v.d]:[v.a,v.b]}
 function vVente(){const v=S.vt,[a,b]=vtRange(),key=S.store+"|"+a+"|"+b;
   
-  const top=`<div class="vthead"><h2>${esc(storeNom())}</h2>
+  const fm=v.ficMode==="per"?"per":"mois";
+  const top=v.fic?`<div class="vthead"><h2>${esc(storeNom())}</h2>
+    <div class="segm vtseg"><button data-vt="ficmode" data-v="mois" aria-pressed="${fm==="mois"}">Mois</button><button data-vt="ficmode" data-v="per" aria-pressed="${fm==="per"}">Période</button></div>
+    ${fm==="mois"?`<div class="segm vtseg" style="grid-template-columns:1fr 1fr 1fr">${[1,3,6].map(n=>`<button data-vt="ficm" data-v="${n}" aria-pressed="${(v.ficM||3)===n}">${n} mois</button>`).join("")}</div>`
+    :`<div class="vtdate">du <input type="date" id="vtA" value="${v.a}"> au <input type="date" id="vtB" value="${v.b}" max="${todayISO()}"> ${[["7","7 j"],["30","30 j"],["m","Ce mois"],["mp","Mois dernier"],["an","Cette année"]].map(x=>`<button class="btn small" data-vt="vite" data-v="${x[0]}">${x[1]}</button>`).join("")}</div>`}
+    </div>
+    <div id="vtUp" class="vtup">${esc(VT.up.msg||"")}</div>`
+  :`<div class="vthead"><h2>${esc(storeNom())}</h2>
     <div class="segm vtseg"><button data-vt="mode" data-v="jour" aria-pressed="${v.mode==="jour"}">Jour</button><button data-vt="mode" data-v="per" aria-pressed="${v.mode==="per"}">Période</button></div>
     ${v.mode==="jour"?`<div class="vtdate"><button class="btn small" data-vt="jour" data-n="-1" aria-label="Jour précédent">‹</button><input type="date" id="vtD" value="${v.d}" max="${todayISO()}"><button class="btn small" data-vt="jour" data-n="1" aria-label="Jour suivant">›</button><b class="vtwd">${esc(VT_JL[vtWd(v.d)])}</b></div>`
     :`<div class="vtdate">du <input type="date" id="vtA" value="${v.a}"> au <input type="date" id="vtB" value="${v.b}" max="${todayISO()}"> ${[["7","7 j"],["30","30 j"],["m","Ce mois"],["mp","Mois dernier"],["an","Cette année"]].map(x=>`<button class="btn small" data-vt="vite" data-v="${x[0]}">${x[1]}</button>`).join("")}</div>`}
@@ -1021,7 +1030,7 @@ function vtFiche(A){const v=S.vt,nk=FAC&&FAC.nk?FAC.nk:(s=>String(s||"").toUpper
   const cand=v.art?vtLst(A.art).filter(x=>x.k===v.art.trim()||nk(x.nm).includes(q)).sort((u,w)=>w.ca-u.ca):[];
   const e=cand.find(x=>x.k===v.art.trim())||(cand.length===1?cand[0]:null);
   const per=A.days.length?vtDl(A.days[0].d)+" → "+vtDl(A.days[A.days.length-1].d):"";
-  let h=`<div class="vtbar2"><input id="vtArt" type="search" placeholder="Code-barres ou libellé de l'article…" value="${esc(v.art)}" autocomplete="off" list="vtArtL"><datalist id="vtArtL">${vtTopArt(A,"ca",400).map(x=>`<option value="${esc(x.k)}">${esc(x.nm)}</option>`).join("")}</datalist><span class="vtsub">${esc(per)}${S.vt.mode==="jour"?" (90 jours jusqu'au jour choisi)":""}</span></div>`;
+  let h=`<div class="vtbar2"><input id="vtArt" type="search" placeholder="Code-barres ou libellé de l'article…" value="${esc(v.art)}" autocomplete="off" list="vtArtL"><datalist id="vtArtL">${vtTopArt(A,"ca",400).map(x=>`<option value="${esc(x.k)}">${esc(x.nm)}</option>`).join("")}</datalist></div>`; // v26 : phrase des dates retirée (demande du gérant)
   if(!v.art)return h+`<div class="empty-state">Tapez un code-barres ou une partie du libellé, ou cliquez sur un article dans les autres vues.</div>`;
   if(!e)return h+(cand.length?`<div class="panel flush vtg"><div class="band">${cand.length} articles trouvés</div><div class="scroll"><table><tbody>${cand.slice(0,100).map(x=>`<tr class="vtclk" data-vt="fiche" data-v="${esc(x.k)}"><td class="l vtean">${esc(x.k)}</td><td class="l">${esc(x.nm)}</td><td>${vtQe(x)}</td><td>${vtE(x.ca)}</td></tr>`).join("")}</tbody></table></div></div>`:`<div class="empty-state">Aucune vente de cet article sur la période.</div>`);
   const ser=A.days.map(D=>{const a=D.art.find(x=>x[0]===e.k);return[D.d,a?a[3]:0,a?a[4]:0]}),wd={},wn={};A.days.forEach(D=>{const w=vtWd(D.d);wn[w]=(wn[w]||0)+1});ser.forEach(s=>{const w=vtWd(s[0]);wd[w]=(wd[w]||0)+s[1]});
@@ -1075,7 +1084,7 @@ document.addEventListener("click",e=>{const b=e.target.closest("[data-vt]");if(!
   if(k==="mode"){v.mode=val;v.lim=200}else if(k==="vue"){v.vue=val;v.lim=200}else if(k==="jour"){v.d=vtAdd(v.d,+b.dataset.n);if(v.d>todayISO())v.d=todayISO()}
   else if(k==="vite"){vtVite(val)}else if(k==="open"){v.open[val]=!v.open[val]}else if(k==="tri"){v.tri=val}else if(k==="plus"){v.lim+=500}
   else if(k==="tout"){if(val==="1"){const A=vtAgg(VT.load&&VT.load.days||[]);vtLst(A.ray).forEach(r=>v.open["r"+r.k]=1);vtLst(A.fam).forEach(f=>v.open["f"+f.k]=1)}else v.open={}}
-  else if(k==="ray"){v.vue="articles";v.fic=0;v.ray=val;v.q="";v.lim=200}else if(k==="fiche"){if(!v.fic)v.retY=window.scrollY;v.fic=1;v.art=val;window.scrollTo(0,0)}else if(k==="retour"){v.fic=0;v.scrollRet=v.retY||0}else if(k==="abc"){v.abc=val;v.lim=200}
+  else if(k==="ray"){v.vue="articles";v.fic=0;v.ray=val;v.q="";v.lim=200}else if(k==="fiche"){if(!v.fic)v.retY=window.scrollY;v.fic=1;v.art=val;window.scrollTo(0,0)}else if(k==="ficmode"){v.ficMode=val}else if(k==="ficm"){v.ficM=+val}else if(k==="retour"){v.fic=0;v.scrollRet=v.retY||0}else if(k==="abc"){v.abc=val;v.lim=200}
   S.tab=v.vue;try{localStorage.setItem("gestat.tab",S.tab)}catch(_){}vtSave();render()});
 document.addEventListener("change",e=>{const t=e.target,v=S.vt;if(false)return;
   if(t.id==="vtD"&&t.value){v.d=t.value;render()}else if(t.id==="vtA"&&t.value){v.a=t.value;if(v.b<v.a)v.b=v.a;render()}else if(t.id==="vtB"&&t.value){v.b=t.value;if(v.a>v.b)v.a=v.b;render()}
