@@ -516,7 +516,7 @@ td mark,.ctdet mark{background:#fff1a8;color:#111;border-radius:3px;padding:0 1p
 <script>
 (function(){
 "use strict";
-const APP="GESTAT",APP_VERSION=26;
+const APP="GESTAT",APP_VERSION=27;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const eur=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
@@ -1236,5 +1236,8 @@ if(PC&&window.api.updateCheck){let last=0;const auto=()=>{if(Date.now()-last<600
 })();
 
 </script>
+<style id="ges-nobarre">html.ges-ico body>div[style*="2147483645"]{display:none!important}</style>
+<script>/* 24/11/2026 : pas de bandeau GES « Changer de logiciel » quand on fait défiler la page ; on change de logiciel par l'icône du titre. Le bandeau reste seulement sur une page sans icône (écran de connexion). */
+(function(){var q='header.top .appico, .top .brand .bi, header .brand .bi';function f(){var h=false;try{document.querySelectorAll(q).forEach(function(i){var r=i.getBoundingClientRect();if(r.width>=4&&r.height>=4)h=true;});}catch(e){}document.documentElement.classList.toggle('ges-ico',h);}document.addEventListener('scroll',f,true);addEventListener('resize',f);setInterval(f,400);f();})();</script>
 </body>
 </html>
